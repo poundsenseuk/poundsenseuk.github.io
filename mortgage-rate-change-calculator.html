@@ -6,7 +6,6 @@
   <title>PoundSenseUK – Mortgage Fixed Term Rate Change Calculator</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 </head>
 
 <body>
@@ -135,7 +134,7 @@
         <div class="callout">
           <div class="tag best">Chart note</div>
           <p class="small muted" style="margin:0;">
-            Chart shows values as <b>% of your starting balance</b> so both lines share one axis (no misleading dual-scale).
+            Chart shows values in <b>£</b> on a single axis (no misleading dual-scale).
           </p>
         </div>
       </div>
@@ -257,10 +256,10 @@
       return { endBalance: balance, schedule };
     }
 
-    // ---------- chart (single axis, % of starting balance) ----------
+    // ---------- chart (single axis, £) ----------
     let chart;
 
-    function renderChart(labels, balancePct, paidPct){
+    function renderChart(labels, balanceSeries, paidSeries){
       const ctx = document.getElementById('chart');
       if (chart) chart.destroy();
 
@@ -269,8 +268,8 @@
         data: {
           labels,
           datasets: [
-            { label: 'Balance remaining (% of start)', data: balancePct, tension: 0.25 },
-            { label: 'Total paid (% of start)', data: paidPct, tension: 0.15 }
+            { label: 'Balance remaining (£)', data: balanceSeries, tension: 0.25 },
+            { label: 'Total paid (£)', data: paidSeries, tension: 0.15 }
           ]
         },
         options: {
@@ -281,7 +280,7 @@
             legend: { labels: { color: '#93a4b8' } },
             tooltip: {
               callbacks: {
-                label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(c.raw ?? 0)}%`
+                label: (c) => `${c.dataset.label}: ${GBP(c.raw ?? 0)}`
               }
             }
           },
@@ -289,7 +288,11 @@
             x: { ticks: { color: '#93a4b8' }, grid: { color: 'rgba(34,48,71,.35)' } },
             y: {
               beginAtZero: true,
-              ticks: { color: '#93a4b8', callback: (v) => `${v}%` },
+              ticks: {
+                color: '#93a4b8',
+                maxTicksLimit: 8,
+                callback: (v) => GBP(v)
+              },
               grid: { color: 'rgba(34,48,71,.35)' }
             }
           }
@@ -403,7 +406,7 @@
         }
       }
 
-      // KPIs in £ (keep the human-friendly numbers here)
+      // KPIs in £
       document.getElementById('pmtFixed').textContent = GBP(pmtFixedBase);
       document.getElementById('balEndFixed').textContent = GBP(balanceEndFixed);
       document.getElementById('pmtAfter').textContent = GBP(pmtAfterBase);
@@ -412,13 +415,9 @@
       document.getElementById('totalInterest').textContent = GBP(cumInterest);
       document.getElementById('paidFixed').textContent = GBP(paidFixed);
 
-      // Chart in % of starting balance (single axis, honest comparison)
-      const startBal = balance;
-      const balancePct = balances.map(v => Math.round((v / startBal) * 10000) / 100);
-      const paidPct = cumulativePaid.map(v => Math.round((v / startBal) * 10000) / 100);
-
+      // Chart in £ (single axis)
       document.getElementById('results').style.display = 'block';
-      renderChart(labels, balancePct, paidPct);
+      renderChart(labels, balances, cumulativePaid);
     }
 
     function reset(e){
