@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PoundSenseUK – Mortgage Rate Change Calculator</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Mortgage Rate Change Calculator (UK)</h1>
+      <p class="sub">
+        Estimates your balance at the end of your fixed deal and the new payment needed to finish on time.
+        Uses a daily-interest approximation (closer to how UK mortgages work).
+      </p>
+
+      <div class="pillrow">
+        <span class="pill">Anonymous</span>
+        <span class="pill">Client-side only</span>
+        <span class="pill">Daily interest approx</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+
+        <div id="msg" class="alert warn" style="display:none;"></div>
+
+        <div class="formgrid">
+          <div class="field">
+            <label for="balance">Remaining balance (£)</label>
+            <input id="balance" type="number" min="0" step="100" value="120000" />
+            <p class="help">The amount you currently owe (approx is fine).</p>
+          </div>
+
+          <div class="field">
+            <label for="termYears">Remaining term (years)</label>
+            <input id="termYears" type="number" min="0" step="1" value="22" />
+          </div>
+
+          <div class="field">
+            <label for="termMonths">Remaining term (months)</label>
+            <input id="termMonths" type="number" min="0" max="11" step="1" value="0" />
+            <p class="help">Add extra months beyond whole years (0–11).</p>
+          </div>
+
+          <div class="field">
+            <label for="rateFixed">Current fixed interest rate (%)</label>
+            <input id="rateFixed" type="number" min="0" step="0.01" value="2.70" />
+          </div>
+
+          <div class="field">
+            <label for="fixedYears">Fixed deal remaining (years)</label>
+            <input id="fixedYears" type="number" min="0" step="1" value="2" />
+          </div>
+
+          <div class="field">
+            <label for="fixedMonths">Fixed deal remaining (months)</label>
+            <input id="fixedMonths" type="number" min="0" max="11" step="1" value="6" />
+          </div>
+
+          <div class="field">
+            <label for="rateAfter">Estimated rate after fixed deal (%)</label>
+            <input id="rateAfter" type="number" min="0" step="0.01" value="5.50" />
+            <p class="help">A guess for your follow-on rate / new deal rate.</p>
+          </div>
+
+          <div class="field">
+            <label for="overpay">Overpayment (£/month, optional)</label>
+            <input id="overpay" type="number" min="0" step="10" value="0" />
+            <p class="help">Added on top of the calculated payment (clamped so it won’t overpay).</p>
+          </div>
+        </div>
+
+        <div class="inline" style="margin-top:12px;">
+          <label class="check">
+            <input id="dailyMode" type="checkbox" checked />
+            Use daily-interest approximation (recommended)
+          </label>
+
+          <a class="btn" href="#" id="calcBtn">Calculate</a>
+          <a class="btn secondary" href="#" id="resetBtn">Reset</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <p class="note">
+          <b>Disclaimer:</b> Educational estimate only. Real lenders may use daily interest, differing month-day rules,
+          fees, ERCs, offsets, payment holidays, product switches and rounding policies. Always verify with your lender/broker.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">Payment during fixed period</div>
+            <div class="value" id="pmtFixed">—</div>
+          </div>
+
+          <div class="kpi">
+            <div class="label">Balance at end of fixed deal</div>
+            <div class="value" id="balEndFixed">—</div>
+          </div>
+
+          <div class="kpi">
+            <div class="label">Payment after rate change</div>
+            <div class="value" id="pmtAfter">—</div>
+          </div>
+        </div>
+
+        <div class="chartwrap">
+          <canvas id="chart" height="220"></canvas>
+        </div>
+
+        <div class="callouts">
+          <div class="callout">
+            <div class="tag caution">Trust check</div>
+            <p class="small muted" style="margin:0;">
+              If your current payment is wildly different from the “Payment during fixed period” above,
+              your mortgage may be interest-only, have fees rolled in, or a different compounding/rounding method.
+            </p>
+          </div>
+
+          <div class="callout">
+            <div class="tag best">Next step idea (monetisable)</div>
+            <p class="small muted" style="margin:0;">
+              Add a small section linking to a remortgage comparison / broker referral as the “natural next step”.
+              That tends to convert better than random links.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p class="disclosure">Affiliate disclosure: Some outbound links may be affiliate links at no extra cost to you.</p>
+      <p class="note">© PoundSenseUK — calculators are estimates, not advice.</p>
+    </footer>
+  </div>
+
+  <script>
+    // ---------- helpers ----------
+    const GBP = (x) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(x);
+
+    function clamp(n, min, max){ return Math.min(Math.max(n, min), max); }
+
+    function monthsTotal(y, m){
+      y = Number.isFinite(y) ? y : 0;
+      m = Number.isFinite(m) ? m : 0;
+      return Math.max(0, Math.floor(y) * 12 + Math.floor(m));
+    }
+
+    // Monthly payment formula uses an effective monthly rate.
+    function paymentFor(balance, monthlyRateEff, nMonths){
+      if (nMonths <= 0) return 0;
+      if (monthlyRateEff <= 0) return balance / nMonths;
+      return balance * monthlyRateEff / (1 - Math.pow(1 + monthlyRateEff, -nMonths));
+    }
+
+    // Build month-by-month days from "now" so the daily approximation respects real month lengths.
+    function monthDayCounts(nMonths){
+      const days = [];
+      const d = new Date(); // now
+      for (let i = 0; i < nMonths; i++){
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0..11
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        days.push(daysInMonth);
+        d.setMonth(month + 1);
+      }
+      return days;
+    }
+
+    // Convert APR to an effective monthly rate:
+    // - If dailyMode: compute from daily rate across average month length (365.2425/12)
+    // - Else: simple nominal monthly = APR/12
+    function effectiveMonthlyRate(aprPct, dailyMode){
+      const apr = aprPct / 100;
+      if (apr <= 0) return 0;
+      if (!dailyMode) return apr / 12;
+
+      const daily = apr / 365;                 // daily nominal
+      const avgDays = 365.2425 / 12;           // mean month length
+      return Math.pow(1 + daily, avgDays) - 1; // effective monthly
+    }
+
+    // Simulate a segment month-by-month.
+    // We calculate interest each month using either:
+    // - daily approximation: (1 + apr/365)^(daysInMonth) - 1
+    // - monthly: (apr/12)
+    function simulateSegment({
+      startBalance,
+      aprPct,
+      months,
+      basePayment,
+      overpay,
+      dailyMode,
+      dayCounts,
+      monthOffset
+    }){
+      let balance = startBalance;
+      const schedule = [];
+
+      const apr = aprPct / 100;
+      const monthlyNominal = (apr > 0) ? (apr / 12) : 0;
+      const dailyNominal = (apr > 0) ? (apr / 365) : 0;
+
+      for (let i = 0; i < months; i++){
+        if (balance <= 0) break;
+
+        const days = dayCounts[monthOffset + i] ?? 30;
+        const monthRate = dailyMode
+          ? (apr > 0 ? (Math.pow(1 + dailyNominal, days) - 1) : 0)
+          : monthlyNominal;
+
+        const interest = balance * monthRate;
+
+        // Proposed payment (base + overpay), clamped so it won't overpay past balance+interest.
+        let pay = (basePayment + overpay);
+        const maxPay = balance + interest;
+        pay = Math.min(pay, maxPay);
+
+        const principal = pay - interest;
+        balance = balance - principal;
+
+        // Round like real life money, but keep internal stability.
+        balance = Math.max(0, Math.round(balance * 100) / 100);
+
+        schedule.push({
+          monthIndex: monthOffset + i,
+          balance,
+          payment: Math.round(pay * 100) / 100,
+          interest: Math.round(interest * 100) / 100,
+          principal: Math.round(principal * 100) / 100,
+          monthRate
+        });
+      }
+
+      return { endBalance: balance, schedule };
+    }
+
+    // ---------- chart ----------
+    let chart;
+
+    function renderChart(labels, balances, payments){
+      const ctx = document.getElementById('chart');
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Balance (£)', data: balances, yAxisID: 'y', tension: 0.25 },
+            { label: 'Payment (£)', data: payments, yAxisID: 'y1', tension: 0.15 }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#93a4b8' } },
+            tooltip: {
+              callbacks: {
+                label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(c.raw ?? 0)}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#93a4b8' }, grid: { color: 'rgba(34,48,71,.35)' } },
+            y: { beginAtZero: true, ticks: { color: '#93a4b8' }, grid: { color: 'rgba(34,48,71,.35)' } },
+            y1: { beginAtZero: true, position: 'right', ticks: { color: '#93a4b8' }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    // ---------- UI ----------
+    const msg = document.getElementById('msg');
+
+    function showMsg(text, kind='warn'){
+      msg.className = `alert ${kind}`;
+      msg.textContent = text;
+      msg.style.display = 'block';
+    }
+    function hideMsg(){ msg.style.display = 'none'; }
+
+    function readInputs(){
+      const balance = Number(document.getElementById('balance').value);
+      const term = monthsTotal(Number(document.getElementById('termYears').value), Number(document.getElementById('termMonths').value));
+      const fixedLeft = monthsTotal(Number(document.getElementById('fixedYears').value), Number(document.getElementById('fixedMonths').value));
+      const rateFixed = Number(document.getElementById('rateFixed').value);
+      const rateAfter = Number(document.getElementById('rateAfter').value);
+      const overpay = Number(document.getElementById('overpay').value) || 0;
+      const dailyMode = document.getElementById('dailyMode').checked;
+
+      return { balance, term, fixedLeft, rateFixed, rateAfter, overpay, dailyMode };
+    }
+
+    function validate({ balance, term, fixedLeft, rateFixed, rateAfter, overpay }){
+      if (!(balance > 0)) return 'Remaining balance must be greater than 0.';
+      if (!(term > 0)) return 'Remaining term must be greater than 0 months.';
+      if (fixedLeft < 0) return 'Fixed term remaining cannot be negative.';
+      if (rateFixed < 0 || rateAfter < 0) return 'Interest rates cannot be negative.';
+      if (overpay < 0) return 'Overpayment cannot be negative.';
+      return null;
+    }
+
+    function calculate(e){
+      e.preventDefault();
+      hideMsg();
+
+      const inputs = readInputs();
+      const err = validate(inputs);
+      if (err){ showMsg(err, 'bad'); return; }
+
+      const { balance, term, fixedLeft, rateFixed, rateAfter, overpay, dailyMode } = inputs;
+
+      const fixedMonths = clamp(fixedLeft, 0, term);
+      const afterMonths = term - fixedMonths;
+
+      // Precompute real month lengths for the whole horizon.
+      const dayCounts = monthDayCounts(term);
+
+      // Compute base payments using effective monthly rates (stable formula),
+      // but simulate using per-month rates (daily approximation + real days) for credibility.
+      const rFixedEff = effectiveMonthlyRate(rateFixed, dailyMode);
+      const rAfterEff = effectiveMonthlyRate(rateAfter, dailyMode);
+
+      // Payment during fixed period is the payment that would clear the mortgage over the FULL remaining term
+      // at the current rate (this matches typical amortisation logic unless you explicitly re-amortise).
+      const pmtFixedBase = paymentFor(balance, rFixedEff, term);
+
+      const simFixed = simulateSegment({
+        startBalance: balance,
+        aprPct: rateFixed,
+        months: fixedMonths,
+        basePayment: pmtFixedBase,
+        overpay,
+        dailyMode,
+        dayCounts,
+        monthOffset: 0
+      });
+
+      const balanceEndFixed = simFixed.endBalance;
+
+      // After fixed: re-amortise to finish on time at the new rate
+      const pmtAfterBase = afterMonths > 0 ? paymentFor(balanceEndFixed, rAfterEff, afterMonths) : 0;
+
+      const simAfter = afterMonths > 0 ? simulateSegment({
+        startBalance: balanceEndFixed,
+        aprPct: rateAfter,
+        months: afterMonths,
+        basePayment: pmtAfterBase,
+        overpay,
+        dailyMode,
+        dayCounts,
+        monthOffset: fixedMonths
+      }) : { schedule: [] };
+
+      const full = [...simFixed.schedule, ...simAfter.schedule];
+
+      // If payment is too small to cover interest (can happen with extreme rates/terms), warn.
+      if (full.length > 0) {
+        const first = full[0];
+        if ((pmtFixedBase + overpay) <= first.interest + 0.005) {
+          showMsg('Warning: payment is not covering interest early on (this would increase balance). Check inputs.', 'warn');
+        }
+      }
+
+      // Render KPIs
+      document.getElementById('pmtFixed').textContent = GBP(pmtFixedBase + overpay);
+      document.getElementById('balEndFixed').textContent = GBP(balanceEndFixed);
+      document.getElementById('pmtAfter').textContent = GBP(pmtAfterBase + overpay);
+
+      // Labels + chart series
+      const labels = full.map((_, i) => `M${i + 1}`);
+      const balances = full.map(x => x.balance);
+      const payments = full.map(x => x.payment);
+
+      renderChart(labels, balances, payments);
+    }
+
+    function reset(e){
+      e.preventDefault();
+      document.getElementById('balance').value = 120000;
+      document.getElementById('termYears').value = 22;
+      document.getElementById('termMonths').value = 0;
+      document.getElementById('rateFixed').value = 2.70;
+      document.getElementById('fixedYears').value = 2;
+      document.getElementById('fixedMonths').value = 6;
+      document.getElementById('rateAfter').value = 5.50;
+      document.getElementById('overpay').value = 0;
+      document.getElementById('dailyMode').checked = true;
+
+      hideMsg();
+      document.getElementById('pmtFixed').textContent = '—';
+      document.getElementById('balEndFixed').textContent = '—';
+      document.getElementById('pmtAfter').textContent = '—';
+      if (chart) chart.destroy();
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+    document.getElementById('resetBtn').addEventListener('click', reset);
+  </script>
+</body>
+</html>
