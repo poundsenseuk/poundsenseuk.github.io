@@ -198,3 +198,108 @@ footer{
 }
 .disclosure{font-style: italic; color: #cbd5e1; margin: 0 0 10px}
 .note{margin:0; font-size:.92rem}
+
+/* ---------- Forms / Calculator UI ---------- */
+
+.formgrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+@media(min-width:900px){
+  .formgrid{ grid-template-columns: 1fr 1fr; }
+}
+
+.field{
+  border:1px solid rgba(34,48,71,.9);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,.02);
+}
+.field label{
+  display:block;
+  font-size:.86rem;
+  color: var(--muted);
+  margin:0 0 6px;
+}
+.field input, .field select{
+  width:100%;
+  padding:10px 12px;
+  border-radius: 12px;
+  border:1px solid var(--line);
+  background: rgba(11,15,20,.55);
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+}
+.field input::placeholder{ color: rgba(147,164,184,.65); }
+.field input:focus, .field select:focus{
+  border-color: rgba(110,231,183,.65);
+  box-shadow: 0 0 0 3px rgba(110,231,183,.12);
+}
+.help{
+  font-size:.82rem;
+  color: var(--muted);
+  margin:8px 0 0;
+}
+
+.inline{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.check{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.02);
+  color: var(--muted);
+  font-size:.9rem;
+}
+.check input{ accent-color: var(--accent); }
+
+.alert{
+  border:1px solid var(--line);
+  border-radius: 16px;
+  padding:12px 14px;
+  background: rgba(255,255,255,.03);
+}
+.alert.good{ border-color: rgba(96,165,250,.55); }
+.alert.warn{ border-color: rgba(251,191,36,.55); }
+.alert.bad{  border-color: rgba(251,113,133,.55); }
+
+.kpis{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin-top: 12px;
+}
+@media(min-width:900px){
+  .kpis{ grid-template-columns: repeat(3, 1fr); }
+}
+.kpi{
+  border:1px solid rgba(34,48,71,.9);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,.02);
+}
+.kpi .label{ font-size:.82rem; color: var(--muted); }
+.kpi .value{ font-size:1.25rem; font-weight:800; margin-top:4px; }
+
+.chartwrap{
+  margin-top: 12px;
+  border:1px solid rgba(34,48,71,.9);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(255,255,255,.02);
+}
+canvas{ display:block; width:100%; }
+
+.btn[aria-disabled="true"], .btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
