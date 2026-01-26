@@ -108,7 +108,7 @@ h1{font-size: clamp(1.6rem, 2.5vw, 2.3rem); margin:0 0 6px}
 .tag.best{border-color: rgba(110,231,183,.65); color: #c8fbe7;}
 .tag.caution{border-color: rgba(251,191,36,.65); color:#ffe7a6;}
 .tag.risk{border-color: rgba(251,113,133,.65); color:#ffd0d8;}
-.tag.risk{border-color: rgba(110,225,231,.65); color:#6ee1e7;}
+.tag.info{border-color: rgba(110,225,231,.65); color:#6ee1e7;}
 
 .btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
 .btn{
