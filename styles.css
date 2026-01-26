@@ -299,6 +299,19 @@ footer{
 }
 canvas{ display:block; width:100%; }
 
+/* Chart at ~50% viewport height */
+.chartwrap{
+  height: 50vh;
+  max-height: 50vh;
+  min-height: 320px; /* optional: prevents tiny charts on short screens */
+}
+
+.chartwrap canvas{
+  height: 100% !important;
+  width: 100% !important;
+}
+
+
 .btn[aria-disabled="true"], .btn:disabled{
   opacity:.55;
   cursor:not-allowed;
