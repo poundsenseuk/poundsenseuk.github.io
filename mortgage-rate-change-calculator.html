@@ -143,8 +143,6 @@
         <canvas id="chart"></canvas>
       </div>
 
-      <div class="hr"></div>
-
       <div class="kpis">
         <div class="kpi">
           <div class="label">Total paid over remaining term</div>
@@ -341,6 +339,18 @@
       return null;
     }
 
+    function monthLabelsMMYY(nMonths){
+      const labels = [];
+      const d = new Date(); // now
+      for (let i = 0; i < nMonths; i++){
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = String(d.getFullYear()).slice(-2);
+        labels.push(`${mm}-${yy}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+      return labels;
+    }
+
     function calculate(e){
       e.preventDefault();
       hideMsg();
@@ -393,17 +403,16 @@
       let cumInterest = 0;
       let paidFixed = 0;
 
-      const labels = [];
+      const labels = monthLabelsMMYY(full.length);
       const balances = [];
       const cumulativePaid = [];
-
+      
       for (let i = 0; i < full.length; i++){
         const row = full[i];
         cumPaid += row.payment;
         cumInterest += row.interest;
         if (i < simFixed.schedule.length) paidFixed += row.payment;
-
-        labels.push(`M${i + 1}`);
+      
         balances.push(row.balance);
         cumulativePaid.push(Math.round(cumPaid * 100) / 100);
       }
