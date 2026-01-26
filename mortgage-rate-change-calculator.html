@@ -345,7 +345,7 @@
       for (let i = 0; i < nMonths; i++){
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const yy = String(d.getFullYear()).slice(-2);
-        labels.push(`${mm}-${yy}`);
+        labels.push(`${mm}/${yy}`);
         d.setMonth(d.getMonth() + 1);
       }
       return labels;
