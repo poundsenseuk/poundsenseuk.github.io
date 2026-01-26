@@ -6,6 +6,12 @@
   <title>PoundSenseUK – Mortgage Rate Change Calculator</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- OPTIONAL: If you haven't added the 50vh chart CSS to styles.css yet, you can paste this block into styles.css instead -->
+  <style>
+    .chartwrap{ height:50vh; max-height:50vh; min-height:320px; }
+    .chartwrap canvas{ height:100% !important; width:100% !important; }
+  </style>
 </head>
 
 <body>
@@ -132,15 +138,15 @@
           </p>
         </div>
         <div class="callout">
-          <div class="tag best">What overpayments do</div>
+          <div class="tag best">Chart note</div>
           <p class="small muted" style="margin:0;">
-            Overpaying during your fixed term usually reduces the balance carried into your new rate, which can cut your post-fix payment and total interest.
+            Chart shows values as <b>% of your starting balance</b> so both lines share one axis (no misleading dual-scale).
           </p>
         </div>
       </div>
 
       <div class="chartwrap">
-        <canvas id="chart" height="260"></canvas>
+        <canvas id="chart"></canvas>
       </div>
 
       <div class="hr"></div>
@@ -256,10 +262,10 @@
       return { endBalance: balance, schedule };
     }
 
-    // ---------- chart ----------
+    // ---------- chart (single axis, % of starting balance) ----------
     let chart;
 
-    function renderChart(labels, balances, cumulativePaid, fixedMonths){
+    function renderChart(labels, balancePct, paidPct){
       const ctx = document.getElementById('chart');
       if (chart) chart.destroy();
 
@@ -268,25 +274,29 @@
         data: {
           labels,
           datasets: [
-            { label: 'Balance (£)', data: balances, yAxisID: 'y', tension: 0.25 },
-            { label: 'Total paid so far (£)', data: cumulativePaid, yAxisID: 'y1', tension: 0.15 }
+            { label: 'Balance remaining (% of start)', data: balancePct, tension: 0.25 },
+            { label: 'Total paid (% of start)', data: paidPct, tension: 0.15 }
           ]
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { labels: { color: '#93a4b8' } },
             tooltip: {
               callbacks: {
-                label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(c.raw ?? 0)}`
+                label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(c.raw ?? 0)}%`
               }
             }
           },
           scales: {
             x: { ticks: { color: '#93a4b8' }, grid: { color: 'rgba(34,48,71,.35)' } },
-            y: { beginAtZero: true, ticks: { color: '#93a4b8' }, grid: { color: 'rgba(34,48,71,.35)' } },
-            y1: { beginAtZero: true, position: 'right', ticks: { color: '#93a4b8' }, grid: { drawOnChartArea: false } }
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#93a4b8', callback: (v) => `${v}%` },
+              grid: { color: 'rgba(34,48,71,.35)' }
+            }
           }
         }
       });
@@ -342,7 +352,6 @@
       const rFixedEff = effectiveMonthlyRate(rateFixed, dailyMode);
       const rAfterEff = effectiveMonthlyRate(rateAfter, dailyMode);
 
-      // Base payment calculated to finish on time over full remaining term at the fixed rate.
       const pmtFixedBase = paymentFor(balance, rFixedEff, term);
 
       const simFixed = simulateSegment({
@@ -373,7 +382,6 @@
 
       const full = [...simFixed.schedule, ...simAfter.schedule];
 
-      // Build chart series: Balance + cumulative paid
       let cumPaid = 0;
       let cumInterest = 0;
       let paidFixed = 0;
@@ -393,7 +401,6 @@
         cumulativePaid.push(Math.round(cumPaid * 100) / 100);
       }
 
-      // Warn if the base payment doesn't cover interest at the start (edge cases).
       if (full.length > 0){
         const first = full[0];
         if ((pmtFixedBase + overpayFixed) <= first.interest + 0.005){
@@ -401,7 +408,7 @@
         }
       }
 
-      // Render KPIs
+      // KPIs in £ (keep the human-friendly numbers here)
       document.getElementById('pmtFixed').textContent = GBP(pmtFixedBase);
       document.getElementById('balEndFixed').textContent = GBP(balanceEndFixed);
       document.getElementById('pmtAfter').textContent = GBP(pmtAfterBase);
@@ -410,9 +417,13 @@
       document.getElementById('totalInterest').textContent = GBP(cumInterest);
       document.getElementById('paidFixed').textContent = GBP(paidFixed);
 
-      // Show results + chart
+      // Chart in % of starting balance (single axis, honest comparison)
+      const startBal = balance;
+      const balancePct = balances.map(v => Math.round((v / startBal) * 10000) / 100);
+      const paidPct = cumulativePaid.map(v => Math.round((v / startBal) * 10000) / 100);
+
       document.getElementById('results').style.display = 'block';
-      renderChart(labels, balances, cumulativePaid, fixedMonths);
+      renderChart(labels, balancePct, paidPct);
     }
 
     function reset(e){
