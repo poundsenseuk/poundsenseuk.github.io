@@ -22,11 +22,10 @@
         <span class="pill">Client-side only</span>
         <span class="pill">Daily interest approx</span>
       </div>
-      
+
       <div class="pillrow">
-        <a href="https://poundsenseuk.github.io" ><span class="pill">Go To Home</span></a>
+        <a href="https://poundsenseuk.github.io"><span class="pill">Go To Home</span></a>
       </div>
-      
     </header>
 
     <!-- INPUTS (full width) -->
@@ -40,6 +39,12 @@
           <label for="balance">Remaining balance (£)</label>
           <input id="balance" type="number" min="0" step="100" value="120000" />
           <p class="help">The amount you currently owe (approx is fine).</p>
+        </div>
+
+        <div class="field">
+          <label for="propertyValue">Property value (£, optional)</label>
+          <input id="propertyValue" type="number" min="0" step="1000" value="" placeholder="e.g. 250000" />
+          <p class="help">Used to estimate LTV at the end of your fixed term. Leave blank if unsure.</p>
         </div>
 
         <div class="field">
@@ -119,6 +124,10 @@
         <div class="kpi">
           <div class="label">Balance at end of fixed deal</div>
           <div class="value" id="balEndFixed">—</div>
+
+          <p class="help" id="ltvLine" style="display:none; margin-top:8px;">
+            Estimated LTV at end of fix: <b id="ltvValue">—</b>
+          </p>
         </div>
 
         <div class="kpi">
@@ -324,6 +333,7 @@
 
     function readInputs(){
       const balance = Number(document.getElementById('balance').value);
+      const propertyValue = Number(document.getElementById('propertyValue').value) || 0;
       const term = monthsTotal(Number(document.getElementById('termYears').value), Number(document.getElementById('termMonths').value));
       const fixedLeft = monthsTotal(Number(document.getElementById('fixedYears').value), Number(document.getElementById('fixedMonths').value));
       const rateFixed = Number(document.getElementById('rateFixed').value);
@@ -332,15 +342,16 @@
       const overpayAfter = Number(document.getElementById('overpayAfter').value) || 0;
       const dailyMode = document.getElementById('dailyMode').checked;
 
-      return { balance, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter, dailyMode };
+      return { balance, propertyValue, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter, dailyMode };
     }
 
-    function validate({ balance, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter }){
+    function validate({ balance, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter, propertyValue }){
       if (!(balance > 0)) return 'Remaining balance must be greater than 0.';
       if (!(term > 0)) return 'Remaining term must be greater than 0 months.';
       if (fixedLeft < 0) return 'Fixed term remaining cannot be negative.';
       if (rateFixed < 0 || rateAfter < 0) return 'Interest rates cannot be negative.';
       if (overpayFixed < 0 || overpayAfter < 0) return 'Overpayments cannot be negative.';
+      if (propertyValue < 0) return 'Property value cannot be negative.';
       return null;
     }
 
@@ -364,7 +375,7 @@
       const err = validate(inputs);
       if (err){ showMsg(err, 'bad'); return; }
 
-      const { balance, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter, dailyMode } = inputs;
+      const { balance, propertyValue, term, fixedLeft, rateFixed, rateAfter, overpayFixed, overpayAfter, dailyMode } = inputs;
 
       const fixedMonths = clamp(fixedLeft, 0, term);
       const afterMonths = term - fixedMonths;
@@ -411,13 +422,13 @@
       const labels = monthLabelsMMYY(full.length);
       const balances = [];
       const cumulativePaid = [];
-      
+
       for (let i = 0; i < full.length; i++){
         const row = full[i];
         cumPaid += row.payment;
         cumInterest += row.interest;
         if (i < simFixed.schedule.length) paidFixed += row.payment;
-      
+
         balances.push(row.balance);
         cumulativePaid.push(Math.round(cumPaid * 100) / 100);
       }
@@ -438,6 +449,19 @@
       document.getElementById('totalInterest').textContent = GBP(cumInterest);
       document.getElementById('paidFixed').textContent = GBP(paidFixed);
 
+      // LTV (only if property value provided)
+      const ltvLine = document.getElementById('ltvLine');
+      const ltvValueEl = document.getElementById('ltvValue');
+
+      if (propertyValue > 0){
+        const ltv = (balanceEndFixed / propertyValue) * 100;
+        ltvValueEl.textContent = `${ltv.toFixed(1)}%`;
+        ltvLine.style.display = 'block';
+      } else {
+        ltvLine.style.display = 'none';
+        ltvValueEl.textContent = '—';
+      }
+
       // Chart in £ (single axis)
       document.getElementById('results').style.display = 'block';
       renderChart(labels, balances, cumulativePaid);
@@ -446,6 +470,7 @@
     function reset(e){
       e.preventDefault();
       document.getElementById('balance').value = 120000;
+      document.getElementById('propertyValue').value = '';
       document.getElementById('termYears').value = 22;
       document.getElementById('termMonths').value = 0;
       document.getElementById('rateFixed').value = 2.70;
@@ -455,6 +480,10 @@
       document.getElementById('overpayFixed').value = 0;
       document.getElementById('overpayAfter').value = 0;
       document.getElementById('dailyMode').checked = true;
+
+      // Hide LTV line on reset
+      document.getElementById('ltvLine').style.display = 'none';
+      document.getElementById('ltvValue').textContent = '—';
 
       hideMsg();
       document.getElementById('results').style.display = 'none';
