@@ -322,7 +322,7 @@
             </tr>
           </thead>
           <tbody id="snapTbody">
-            <tr><td colspan="5" class="muted">Calculate to see snapshot.</td></tr>
+            <tr><td colspan="6" class="muted">Calculate to see snapshot.</td></tr>
           </tbody>
         </table>
       </div>
@@ -738,7 +738,7 @@
     }
 
     // ---------------- snapshot table ----------------
-    function renderSnapshot(startDate, result){
+      function renderSnapshot(startDate, result){
         const tb = document.getElementById('snapTbody');
       
         const monthsLen = result.seriesNom.length;
@@ -747,23 +747,21 @@
           return;
         }
       
-        // We assume seriesContribNom is cumulative "total paid in" (including starting balance if you baseline it)
-        // Yearly contributed = change in seriesContribNom over that year (excluding any starting balance already baked in)
         const rows = [];
         const nYears = Math.ceil(monthsLen / 12);
       
         let prevTotalContrib = 0;
       
         for (let y = 1; y <= nYears; y++){
-          const idx = Math.min(y * 12 - 1, monthsLen - 1); // end of year or end of projection
+          const idx = Math.min(y * 12 - 1, monthsLen - 1);
       
           const nomBal = result.seriesNom[idx] ?? 0;
           const realBal = result.seriesReal[idx] ?? 0;
       
-          const totalContrib = result.seriesContribNom[idx] ?? 0; // cumulative paid in (baseline + flows)
+          const totalContrib = result.seriesContribNom[idx] ?? 0;
           const contributedYear = totalContrib - prevTotalContrib;
       
-          const interestEarned = nomBal - totalContrib; // since balance = contributions + interest (with withdrawals already netted into totalContrib)
+          const interestEarned = nomBal - totalContrib;
       
           rows.push(`
             <tr>
@@ -781,6 +779,7 @@
       
         tb.innerHTML = rows.join('');
       }
+
 
       if (!rows.length){
         tb.innerHTML = `<tr><td colspan="5" class="muted">Projection too short for snapshot years.</td></tr>`;
