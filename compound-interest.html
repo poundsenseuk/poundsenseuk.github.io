@@ -13,14 +13,14 @@
     <header>
       <h1>Compound Interest Calculator (UK)</h1>
       <p class="sub">
-        Simple mode for quick answers, Advanced mode for real-life timelines (rate changes, lump sums, pauses).
-        Calculates both <b>nominal</b> and <b>inflation-adjusted</b> (“today’s money”) projections.
+        A practical “what happens to my money over time?” tool. Includes inflation (“today’s money”), contribution increases,
+        and optional advanced events (lump sums, rate changes, pause/resume contributions).
       </p>
 
       <div class="pillrow">
         <span class="pill">Anonymous</span>
         <span class="pill">Client-side only</span>
-        <span class="pill">Monthly simulation</span>
+        <span class="pill">Monthly timeline simulation</span>
       </div>
 
       <div class="pillrow">
@@ -31,46 +31,20 @@
     <!-- INPUTS -->
     <div class="card">
       <h2>Inputs</h2>
-
       <div id="msg" class="alert warn" style="display:none;"></div>
 
-      <div class="callouts callouts--single" style="margin-top:10px;">
-        <div class="callout">
-          <div class="tag info">Mode</div>
-          <div class="inline" style="gap:8px;">
-            <a class="btn" href="#" id="simpleTab">Simple</a>
-            <a class="btn secondary" href="#" id="advancedTab">Advanced (Events)</a>
-          </div>
-          <p class="small muted" style="margin:10px 0 0;">
-            Advanced mode lets you add dated events like “£5,000 lump sum in 2028” or “rate changes to 4% from 2030”.
-          </p>
-        </div>
-      </div>
-
-      <!-- Common inputs -->
-      <div class="formgrid" style="margin-top:12px;">
+      <!-- Core inputs (always visible) -->
+      <div class="formgrid">
         <div class="field">
           <label for="startBalance">Starting balance (£)</label>
           <input id="startBalance" type="number" min="0" step="100" value="5000" />
-          <p class="help">Your current pot / starting amount.</p>
+          <p class="help">Your starting pot.</p>
         </div>
 
         <div class="field">
           <label for="startDate">Start date</label>
           <input id="startDate" type="date" />
-          <p class="help">Defaults to today. Projections run month-by-month from this date.</p>
-        </div>
-
-        <div class="field">
-          <label for="rateApr">Interest rate (annual %, nominal)</label>
-          <input id="rateApr" type="number" min="0" step="0.01" value="7.00" />
-          <p class="help">This is a constant rate in Simple mode. In Advanced mode, events can change it.</p>
-        </div>
-
-        <div class="field">
-          <label for="inflation">Inflation (annual %, optional)</label>
-          <input id="inflation" type="number" min="0" step="0.01" value="2.50" />
-          <p class="help">Used to show “today’s money” (real value). Set to 0 to ignore inflation.</p>
+          <p class="help">Defaults to today.</p>
         </div>
 
         <div class="field">
@@ -83,127 +57,160 @@
           <input id="months" type="number" min="0" max="11" step="1" value="0" />
           <p class="help">Add months beyond whole years (0–11).</p>
         </div>
-      </div>
 
-      <!-- SIMPLE MODE -->
-      <div id="simplePanel" style="margin-top:12px;">
-        <div class="hr"></div>
+        <div class="field">
+          <label for="rateApr">Interest rate (APR %, nominal)</label>
+          <input id="rateApr" type="number" min="0" step="0.01" value="7.00" />
+          <p class="help">Nominal return (before inflation). Advanced events can change this over time.</p>
+        </div>
 
-        <h2 style="margin-top:0;">Simple mode</h2>
+        <div class="field">
+          <label for="compoundFreq">Compounding frequency</label>
+          <select id="compoundFreq">
+            <option value="monthly" selected>Monthly</option>
+            <option value="daily">Daily (approx)</option>
+            <option value="annual">Annual</option>
+          </select>
+          <p class="help">How interest is applied. (Most “normal” calculators assume monthly.)</p>
+        </div>
 
-        <div class="formgrid">
-          <div class="field">
-            <label for="contribAmount">Contribution amount (£)</label>
-            <input id="contribAmount" type="number" step="10" min="0" value="200" />
-          </div>
+        <div class="field">
+          <label for="inflation">Inflation (annual %, optional)</label>
+          <input id="inflation" type="number" min="0" step="0.01" value="2.50" />
+          <p class="help">
+            Used to show “today’s money” values. Example: 3% inflation means £100 in the future buys ~£97 worth of stuff in today’s terms.
+          </p>
+        </div>
 
-          <div class="field">
-            <label for="contribFreq">Contribution frequency</label>
-            <select id="contribFreq">
-              <option value="monthly" selected>Monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="daily">Daily</option>
-              <option value="yearly">Yearly</option>
-            </select>
-            <p class="help">Converted to an equivalent monthly contribution for simulation.</p>
-          </div>
-
-          <div class="field">
-            <label for="annualIncrease">Yearly contribution increase (%)</label>
-            <input id="annualIncrease" type="number" step="0.1" min="0" value="0" />
-            <p class="help">Example: 3% means your contribution amount rises by 3% each year.</p>
-          </div>
-
-          <div class="field">
-            <label class="check" style="margin-top:22px;">
-              <input id="useIncrease" type="checkbox" />
-              Apply yearly increase
-            </label>
-            <p class="help">If unchecked, contribution stays constant.</p>
-          </div>
+        <div class="field">
+          <label for="safeWR">Withdrawal rate (%, for income estimate)</label>
+          <input id="safeWR" type="number" min="0" step="0.1" value="4.0" />
+          <p class="help">Used for the “monthly income at end” estimate (e.g., 4% rule).</p>
         </div>
       </div>
 
-      <!-- ADVANCED MODE -->
-      <div id="advancedPanel" style="margin-top:12px; display:none;">
-        <div class="hr"></div>
+      <div class="hr"></div>
 
-        <h2 style="margin-top:0;">Advanced mode: Events</h2>
+      <!-- Contributions (always visible; advanced mode uses these as baseline) -->
+      <h2 style="margin-top:0;">Ongoing contributions</h2>
 
-        <div class="callouts callouts--single" style="margin-top:10px;">
-          <div class="callout">
-            <div class="tag best">How events work</div>
-            <p class="small muted" style="margin:0;">
-              Events are applied at the start of the month containing the event date.
-              “Ongoing” changes persist from that month onwards.
-            </p>
-          </div>
+      <div class="formgrid">
+        <div class="field">
+          <label for="contribAmount">Contribution amount (£)</label>
+          <input id="contribAmount" type="number" min="0" step="10" value="200" />
+          <p class="help">Your regular contribution.</p>
         </div>
 
-        <div class="formgrid" style="margin-top:12px;">
-          <div class="field">
-            <label for="baseMonthlyContrib">Base monthly contribution (£)</label>
-            <input id="baseMonthlyContrib" type="number" min="0" step="10" value="200" />
-            <p class="help">Advanced mode uses monthly contributions (events can change it).</p>
-          </div>
-
-          <div class="field">
-            <label for="eventType">Event type</label>
-            <select id="eventType">
-              <option value="oneoff_cash" selected>One-off deposit / withdrawal</option>
-              <option value="ongoing_contrib_delta">Ongoing change to monthly contribution</option>
-              <option value="rate_change">Change interest rate (APR) from date</option>
-            </select>
-            <p class="help">Choose what the event changes.</p>
-          </div>
-
-          <div class="field">
-            <label for="eventDate">Event date</label>
-            <input id="eventDate" type="date" />
-          </div>
-
-          <div class="field">
-            <label for="eventValue">Value (£ or %)</label>
-            <input id="eventValue" type="number" step="0.01" value="1000" />
-            <p class="help" id="eventHelp">
-              For cash: +1000 deposit, -1000 withdrawal. For rate change: enter new APR (%).
-            </p>
-          </div>
+        <div class="field">
+          <label for="contribFreq">Contribution frequency</label>
+          <select id="contribFreq">
+            <option value="monthly" selected>Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="yearly">Yearly</option>
+          </select>
+          <p class="help">Converted into an equivalent monthly amount for the timeline.</p>
         </div>
 
-        <div class="inline" style="margin-top:12px;">
-          <a class="btn secondary" href="#" id="addEventBtn">Add event</a>
-          <a class="btn" href="#" id="clearEventsBtn">Clear events</a>
+        <div class="field">
+          <label for="annualIncrease">Yearly contribution increase (%)</label>
+          <input id="annualIncrease" type="number" min="0" step="0.1" value="0" />
+          <p class="help">
+            If &gt; 0, your contribution amount increases each year by this %. (No checkbox needed.)
+          </p>
         </div>
 
-        <div class="tablewrap" style="margin-top:12px;">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Effect</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="eventsTbody">
-              <tr><td colspan="5" class="muted">No events yet.</td></tr>
-            </tbody>
-          </table>
+        <div class="field">
+          <label class="check" style="margin-top:22px;">
+            <input id="contribPaused" type="checkbox" />
+            Start with contributions paused
+          </label>
+          <p class="help">Useful if you want to model “I’ll start later” without adding an event.</p>
         </div>
       </div>
+
+      <div class="hr"></div>
+
+      <!-- Advanced: events (DOES NOT HIDE SIMPLE) -->
+      <div class="callouts callouts--single" style="margin-top:10px;">
+        <div class="callout">
+          <div class="tag info">Advanced mode (optional)</div>
+          <p class="small muted" style="margin:0;">
+            Use events for *changes* over time: lump sums, withdrawals, rate changes, contribution changes, pause/resume.
+            If you don’t add events, this behaves like a normal compound interest calculator.
+          </p>
+        </div>
+      </div>
+
+      <h2 style="margin-top:14px;">Events</h2>
+
+      <div class="formgrid">
+        <div class="field">
+          <label for="eventType">Event type</label>
+          <select id="eventType">
+            <option value="oneoff_cash" selected>One-off deposit / withdrawal</option>
+            <option value="set_monthly_contrib">Set monthly contribution from date</option>
+            <option value="monthly_contrib_delta">Change monthly contribution (delta) from date</option>
+            <option value="rate_change">Change interest rate (APR) from date</option>
+            <option value="pause_contrib">Pause contributions (for N months)</option>
+            <option value="resume_contrib">Resume contributions</option>
+          </select>
+          <p class="help">Pick what changes at that date.</p>
+        </div>
+
+        <div class="field">
+          <label for="eventDate">Event date</label>
+          <input id="eventDate" type="date" />
+          <p class="help">Applied at the start of the month containing this date.</p>
+        </div>
+
+        <div class="field">
+          <label for="eventValue">Value (£ / % / months)</label>
+          <input id="eventValue" type="number" step="0.01" value="1000" />
+          <p class="help" id="eventHelp"></p>
+        </div>
+
+        <div class="field">
+          <label class="check" style="margin-top:22px;">
+            <input id="eventOngoing" type="checkbox" checked />
+            Ongoing change (where relevant)
+          </label>
+          <p class="help">Some event types are always one-off (e.g., cash deposit). Others persist by definition.</p>
+        </div>
+      </div>
+
+      <div class="inline" style="margin-top:12px;">
+        <a class="btn secondary" href="#" id="addEventBtn">Add event</a>
+        <a class="btn" href="#" id="clearEventsBtn">Clear events</a>
+      </div>
+
+      <div class="tablewrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Value</th>
+              <th>Effect</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="eventsTbody">
+            <tr><td colspan="5" class="muted">No events yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="hr"></div>
 
       <div class="inline" style="margin-top:12px;">
         <a class="btn" href="#" id="calcBtn">Calculate</a>
         <a class="btn secondary" href="#" id="resetBtn">Reset</a>
       </div>
 
-      <div class="hr"></div>
-
-      <p class="note">
-        <b>Disclaimer:</b> Not financial advice. This is an educational estimate only. Real investing returns vary, and inflation is uncertain.
-        Projections are illustrative.
+      <p class="note" style="margin-top:14px;">
+        <b>Disclaimer:</b> Not financial advice. This is an educational estimate. Real returns and inflation vary, taxes matter,
+        and markets don’t move smoothly.
       </p>
     </div>
 
@@ -211,35 +218,25 @@
     <div class="card" id="results" style="margin-top:14px; display:none;">
       <h2>Results</h2>
 
-      <div class="kpis">
-        <div class="kpi">
-          <div class="label">Final value (nominal)</div>
-          <div class="value" id="finalNominal">—</div>
-          <p class="help">Future pounds, not adjusted for inflation.</p>
-        </div>
-
-        <div class="kpi">
-          <div class="label">Final value (today’s money)</div>
-          <div class="value" id="finalReal">—</div>
-          <p class="help">Inflation-adjusted “real” value.</p>
-        </div>
-
-        <div class="kpi">
-          <div class="label">Total contributed</div>
-          <div class="value" id="totalContrib">—</div>
-          <p class="help">Sum of all contributions (including lump sums and changes).</p>
+      <div class="callouts callouts--single" style="margin-top:10px;">
+        <div class="callout">
+          <div class="tag best">What “today’s money” means</div>
+          <p class="small muted" style="margin:0;">
+            <b>Nominal</b> = future pounds (the number you’d see on your account).<br/>
+            <b>Today’s money</b> = inflation-adjusted purchasing power (what that future pot is roughly “worth” in today’s terms).<br/>
+            If inflation is 0%, nominal and today’s money will match.
+          </p>
         </div>
       </div>
 
       <div class="kpis">
         <div class="kpi">
-          <div class="label">Total interest earned</div>
-          <div class="value" id="totalInterest">—</div>
+          <div class="label">Final value (nominal)</div>
+          <div class="value" id="finalNominal">—</div>
         </div>
         <div class="kpi">
-          <div class="label">Real gain (today’s money)</div>
-          <div class="value" id="realGain">—</div>
-          <p class="help">Final real value minus total contributed (nominal contributions are deflated over time).</p>
+          <div class="label">Final value (today’s money)</div>
+          <div class="value" id="finalReal">—</div>
         </div>
         <div class="kpi">
           <div class="label">Projection end date</div>
@@ -247,23 +244,86 @@
         </div>
       </div>
 
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Total contributed (nominal)</div>
+          <div class="value" id="totalContribNom">—</div>
+          <p class="help">Sum of all deposits minus withdrawals (in cash terms).</p>
+        </div>
+        <div class="kpi">
+          <div class="label">Total contributed (today’s money)</div>
+          <div class="value" id="totalContribReal">—</div>
+          <p class="help">Your contributions expressed in today’s purchasing power.</p>
+        </div>
+        <div class="kpi">
+          <div class="label">Total interest earned (nominal)</div>
+          <div class="value" id="totalInterest">—</div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Monthly income at end (nominal)</div>
+          <div class="value" id="incomeNom">—</div>
+          <p class="help">Uses your withdrawal rate (e.g., 4%) divided by 12.</p>
+        </div>
+        <div class="kpi">
+          <div class="label">Monthly income at end (today’s money)</div>
+          <div class="value" id="incomeReal">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Net gain (today’s money)</div>
+          <div class="value" id="netGainReal">—</div>
+          <p class="help">Final today’s-money value minus today’s-money contributions.</p>
+        </div>
+      </div>
+
       <div class="callouts" style="margin-top:12px;">
         <div class="callout">
-          <div class="tag best">Chart note</div>
-          <p class="small muted" style="margin:0;">
-            Shows nominal balance, inflation-adjusted balance, and cumulative contributions on one axis in <b>£</b>.
-          </p>
+          <div class="tag info">Chart view</div>
+          <div class="inline" style="margin-top:8px;">
+            <select id="chartView" style="padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(11,15,20,.55);color:var(--text);">
+              <option value="both" selected>Nominal + Today’s money</option>
+              <option value="nominal">Nominal only</option>
+              <option value="real">Today’s money only</option>
+            </select>
+            <label class="check">
+              <input id="showContribLine" type="checkbox" checked />
+              Show contributions line
+            </label>
+          </div>
         </div>
+
         <div class="callout">
           <div class="tag caution">Reality check</div>
           <p class="small muted" style="margin:0;">
-            Markets don’t grow smoothly. Consider adding a future “range” mode (e.g., 4% / 7% / 10%) for quick sensitivity checks.
+            This is a smooth projection. Real markets vary year-to-year. A future upgrade could add a range view (e.g., 4% / 7% / 10%).
           </p>
         </div>
       </div>
 
       <div class="chartwrap">
         <canvas id="chart"></canvas>
+      </div>
+
+      <div class="hr"></div>
+
+      <h2 style="margin-top:0;">Snapshot (selected years)</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Nominal balance</th>
+              <th>Today’s money</th>
+              <th>Total contributed</th>
+              <th>Interest earned</th>
+            </tr>
+          </thead>
+          <tbody id="snapTbody">
+            <tr><td colspan="5" class="muted">Calculate to see snapshot.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -274,16 +334,18 @@
   </div>
 
   <script>
-    // ---------- helpers ----------
+    // ---------------- helpers ----------------
     const GBP = (x) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(x);
-
     const msg = document.getElementById('msg');
+
     function showMsg(text, kind='warn'){
       msg.className = `alert ${kind}`;
       msg.textContent = text;
       msg.style.display = 'block';
     }
     function hideMsg(){ msg.style.display = 'none'; }
+
+    function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
 
     function monthsTotal(y, m){
       y = Number.isFinite(y) ? y : 0;
@@ -296,32 +358,27 @@
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     }
 
-    function monthKey(d){
-      // "YYYY-MM" for month bucketing
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      return `${d.getFullYear()}-${mm}`;
+    function parseDateOr(dStr, fallback){
+      const d = dStr ? new Date(dStr + "T00:00:00") : null;
+      return (d && !isNaN(d.getTime())) ? d : fallback;
     }
 
     function addMonths(date, n){
       const d = new Date(date);
       const day = d.getDate();
       d.setMonth(d.getMonth() + n);
-
-      // JS date overflow can shift day; clamp to last day of new month if needed
       const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
       d.setDate(Math.min(day, last));
       return d;
     }
 
-    function parseDateOr(dStr, fallback){
-      const d = dStr ? new Date(dStr + "T00:00:00") : null;
-      return (d && !isNaN(d.getTime())) ? d : fallback;
+    function monthKey(d){
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      return `${d.getFullYear()}-${mm}`;
     }
 
-    function annualToMonthlyRate(aprPct){
-      const apr = Math.max(0, aprPct) / 100;
-      // Use effective monthly from APR: (1+apr)^(1/12)-1
-      return (apr <= 0) ? 0 : (Math.pow(1 + apr, 1/12) - 1);
+    function daysInMonth(d){
+      return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
     }
 
     function annualToMonthlyInflation(inflPct){
@@ -330,41 +387,114 @@
     }
 
     function freqToMonthly(amount, freq){
-      amount = Math.max(0, amount || 0);
+      amount = Number(amount) || 0;
       switch(freq){
-        case 'daily':  return amount * (365.2425 / 12); // average days/month
-        case 'weekly': return amount * (52.1775 / 12);  // average weeks/month
+        case 'daily':  return amount * (365.2425 / 12);
+        case 'weekly': return amount * (52.1775 / 12);
         case 'yearly': return amount / 12;
         case 'monthly':
         default:       return amount;
       }
     }
 
-    function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
+    // Interest application per month, depending on compounding mode
+    function interestForMonth(balance, aprPct, compoundFreq, monthStartDate){
+      const apr = Math.max(0, aprPct) / 100;
+      if (apr <= 0) return 0;
 
-    // ---------- Events ----------
-    let events = []; // { id, dateStr, type, value }
+      if (compoundFreq === 'monthly'){
+        const mRate = Math.pow(1 + apr, 1/12) - 1;
+        return balance * mRate;
+      }
 
-    function eventLabel(ev){
-      if (ev.type === 'oneoff_cash') return 'One-off cash';
-      if (ev.type === 'ongoing_contrib_delta') return 'Monthly contrib change';
-      if (ev.type === 'rate_change') return 'Rate change';
-      return ev.type;
+      if (compoundFreq === 'daily'){
+        const daily = apr / 365;
+        const d = daysInMonth(monthStartDate);
+        const mRate = Math.pow(1 + daily, d) - 1;
+        return balance * mRate;
+      }
+
+      // annual: apply only on “anniversary months” (every 12 months)
+      // This is a simplification but very readable for users.
+      if (compoundFreq === 'annual'){
+        const isAnniversary = (monthStartDate.getMonth() === parseDateOr(document.getElementById('startDate').value, new Date()).getMonth());
+        // Apply once per year on that month:
+        return isAnniversary ? (balance * apr) : 0;
+      }
+
+      // default fallback
+      const mRate = Math.pow(1 + apr, 1/12) - 1;
+      return balance * mRate;
+    }
+
+    // ---------------- events ----------------
+    let events = []; // {id, dateStr, type, value}
+
+    function eventLabel(type){
+      switch(type){
+        case 'oneoff_cash': return 'One-off cash';
+        case 'set_monthly_contrib': return 'Set monthly contrib';
+        case 'monthly_contrib_delta': return 'Monthly contrib change';
+        case 'rate_change': return 'Rate change';
+        case 'pause_contrib': return 'Pause contrib';
+        case 'resume_contrib': return 'Resume contrib';
+        default: return type;
+      }
+    }
+
+    function eventValueDisplay(ev){
+      const v = Number(ev.value) || 0;
+      if (ev.type === 'rate_change') return `${v.toFixed(2)}%`;
+      if (ev.type === 'pause_contrib') return `${Math.max(0, Math.floor(v))} months`;
+      if (ev.type === 'resume_contrib') return '—';
+      return GBP(v);
     }
 
     function eventEffectText(ev){
-      if (ev.type === 'oneoff_cash'){
-        const v = Number(ev.value) || 0;
-        return v >= 0 ? 'Adds lump sum' : 'Withdraws lump sum';
+      const v = Number(ev.value) || 0;
+      switch(ev.type){
+        case 'oneoff_cash': return v >= 0 ? 'Adds lump sum' : 'Withdraws lump sum';
+        case 'set_monthly_contrib': return 'Sets ongoing monthly contribution';
+        case 'monthly_contrib_delta': return v >= 0 ? 'Increases monthly contribution' : 'Decreases monthly contribution';
+        case 'rate_change': return 'Sets new APR from date';
+        case 'pause_contrib': return 'Pauses contributions temporarily';
+        case 'resume_contrib': return 'Resumes contributions';
+        default: return '';
       }
-      if (ev.type === 'ongoing_contrib_delta'){
-        const v = Number(ev.value) || 0;
-        return v >= 0 ? 'Increases monthly contrib' : 'Decreases monthly contrib';
+    }
+
+    function helpForEventType(t){
+      const el = document.getElementById('eventHelp');
+      const ongoing = document.getElementById('eventOngoing');
+
+      if (t === 'oneoff_cash'){
+        el.textContent = 'Enter +£ for a deposit or -£ for a withdrawal (one-off).';
+        ongoing.checked = false;
+        ongoing.disabled = true;
+      } else if (t === 'set_monthly_contrib'){
+        el.textContent = 'Enter the new monthly contribution amount from this date onward (e.g., 350 = £350/month).';
+        ongoing.checked = true;
+        ongoing.disabled = true;
+      } else if (t === 'monthly_contrib_delta'){
+        el.textContent = 'Enter the monthly change from this date onward (e.g., +50 = +£50/month, -25 = -£25/month).';
+        ongoing.checked = true;
+        ongoing.disabled = true;
+      } else if (t === 'rate_change'){
+        el.textContent = 'Enter the new APR (%) from this date onward (e.g., 5.5).';
+        ongoing.checked = true;
+        ongoing.disabled = true;
+      } else if (t === 'pause_contrib'){
+        el.textContent = 'Enter how many months to pause contributions for (e.g., 6).';
+        ongoing.checked = false;
+        ongoing.disabled = true;
+      } else if (t === 'resume_contrib'){
+        el.textContent = 'No value needed. Contributions resume from this month.';
+        ongoing.checked = false;
+        ongoing.disabled = true;
+      } else {
+        el.textContent = '';
+        ongoing.disabled = false;
       }
-      if (ev.type === 'rate_change'){
-        return 'Sets new APR';
-      }
-      return '';
     }
 
     function renderEventsTable(){
@@ -373,25 +503,21 @@
         tb.innerHTML = `<tr><td colspan="5" class="muted">No events yet.</td></tr>`;
         return;
       }
+
       const rows = events
         .slice()
         .sort((a,b) => a.dateStr.localeCompare(b.dateStr))
-        .map(ev => {
-          const v = (ev.type === 'rate_change')
-            ? `${Number(ev.value).toFixed(2)}%`
-            : GBP(Number(ev.value) || 0);
-          return `
-            <tr>
-              <td>${ev.dateStr}</td>
-              <td>${eventLabel(ev)}</td>
-              <td>${v}</td>
-              <td class="muted">${eventEffectText(ev)}</td>
-              <td><a href="#" class="btn secondary" data-del="${ev.id}" style="padding:6px 10px; border-radius:10px;">Remove</a></td>
-            </tr>
-          `;
-        }).join('');
-      tb.innerHTML = rows;
+        .map(ev => `
+          <tr>
+            <td>${ev.dateStr}</td>
+            <td>${eventLabel(ev.type)}</td>
+            <td>${eventValueDisplay(ev)}</td>
+            <td class="muted">${eventEffectText(ev)}</td>
+            <td><a href="#" class="btn secondary" data-del="${ev.id}" style="padding:6px 10px; border-radius:10px;">Remove</a></td>
+          </tr>
+        `).join('');
 
+      tb.innerHTML = rows;
       tb.querySelectorAll('[data-del]').forEach(a => {
         a.addEventListener('click', (e) => {
           e.preventDefault();
@@ -402,60 +528,23 @@
       });
     }
 
-    function helpForEventType(t){
-      const el = document.getElementById('eventHelp');
-      if (t === 'oneoff_cash'){
-        el.textContent = 'For cash: +1000 deposit, -1000 withdrawal. Applied once in the month of the date.';
-      } else if (t === 'ongoing_contrib_delta'){
-        el.textContent = 'For contributions: enter the monthly change from the event month onward (e.g., +50 means +£50/month).';
-      } else if (t === 'rate_change'){
-        el.textContent = 'For rate: enter the new APR (%) from the event month onward (e.g., 5.5).';
+    function bucketEventsByMonth(startDate, months){
+      const map = new Map();
+      const end = addMonths(startDate, months);
+
+      for (const ev of events){
+        const d = parseDateOr(ev.dateStr, null);
+        if (!d) continue;
+        if (d < startDate || d >= end) continue;
+        const k = monthKey(d);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(ev);
       }
+      return map;
     }
 
-    // ---------- Chart ----------
+    // ---------------- chart ----------------
     let chart;
-    function renderChart(labels, nominal, real, contribCum){
-      const ctx = document.getElementById('chart');
-      if (chart) chart.destroy();
-
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Balance (nominal £)', data: nominal, tension: 0.25 },
-            { label: 'Balance (today’s money £)', data: real, tension: 0.25 },
-            { label: 'Total contributed (£)', data: contribCum, tension: 0.15 }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { labels: { color: '#93a4b8' } },
-            tooltip: {
-              callbacks: {
-                label: (c) => `${c.dataset.label}: ${GBP(c.raw ?? 0)}`
-              }
-            }
-          },
-          scales: {
-            x: { ticks: { color: '#93a4b8', maxTicksLimit: 12 }, grid: { color: 'rgba(34,48,71,.35)' } },
-            y: {
-              beginAtZero: true,
-              ticks: {
-                color: '#93a4b8',
-                maxTicksLimit: 8,
-                callback: (v) => GBP(v)
-              },
-              grid: { color: 'rgba(34,48,71,.35)' }
-            }
-          }
-        }
-      });
-    }
 
     function monthLabelsMMYY(startDate, nMonths){
       const labels = [];
@@ -469,200 +558,372 @@
       return labels;
     }
 
-    // ---------- Simulation ----------
-    function simulateSimple({
+    function renderChart(labels, nominal, real, contribNom, view, showContrib){
+      const ctx = document.getElementById('chart');
+      if (chart) chart.destroy();
+
+      const dsNom = { label: 'Balance (nominal £)', data: nominal, tension: 0.25, hidden: (view === 'real') };
+      const dsReal = { label: 'Balance (today’s money £)', data: real, tension: 0.25, hidden: (view === 'nominal') };
+      const dsCon = { label: 'Total contributed (£)', data: contribNom, tension: 0.15, hidden: !showContrib };
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [dsNom, dsReal, dsCon] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#93a4b8' } },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${GBP(c.raw ?? 0)}` } }
+          },
+          scales: {
+            x: { ticks: { color: '#93a4b8', maxTicksLimit: 12 }, grid: { color: 'rgba(34,48,71,.35)' } },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#93a4b8', maxTicksLimit: 8, callback: (v) => GBP(v) },
+              grid: { color: 'rgba(34,48,71,.35)' }
+            }
+          }
+        }
+      });
+    }
+
+    // ---------------- simulation ----------------
+    function simulate({
       startBalance,
       startDate,
       months,
       aprPct,
       inflationPct,
-      contribAmount,
-      contribFreq,
+      compoundFreq,
+      baseContribAmount,
+      baseContribFreq,
       annualIncreasePct,
-      useIncrease
+      startPaused
     }){
-      let balance = Math.max(0, startBalance);
-      const mRate = annualToMonthlyRate(aprPct);
-      const mInfl = annualToMonthlyInflation(inflationPct);
+      let balance = Math.max(0, Number(startBalance) || 0);
 
-      let monthlyContrib = freqToMonthly(contribAmount, contribFreq);
-      const inc = Math.max(0, annualIncreasePct) / 100;
-
-      let totalContrib = 0;
-      let totalInterest = 0;
-
-      const seriesNom = [];
-      const seriesReal = [];
-      const seriesContrib = [];
-
-      let cumContrib = 0;
-      let inflFactor = 1; // grows with inflation, used to deflate nominal -> real
-
-      for (let i = 0; i < months; i++){
-        // apply annual increase at each "year boundary" (every 12 months), after month 0
-        if (useIncrease && i > 0 && i % 12 === 0){
-          monthlyContrib = monthlyContrib * (1 + inc);
-        }
-
-        // contributions at start of month
-        balance += monthlyContrib;
-        totalContrib += monthlyContrib;
-        cumContrib += monthlyContrib;
-
-        // interest for month
-        const interest = balance * mRate;
-        balance += interest;
-        totalInterest += interest;
-
-        // inflation factor accumulates
-        inflFactor *= (1 + mInfl);
-        const realVal = (inflFactor > 0) ? (balance / inflFactor) : balance;
-
-        seriesNom.push(round2(balance));
-        seriesReal.push(round2(realVal));
-        seriesContrib.push(round2(cumContrib));
-      }
-
-      const endDate = addMonths(startDate, months);
-      return {
-        finalNominal: round2(balance),
-        finalReal: round2(seriesReal[seriesReal.length-1] ?? 0),
-        totalContrib: round2(totalContrib),
-        totalInterest: round2(totalInterest),
-        seriesNom, seriesReal, seriesContrib,
-        endDate
-      };
-    }
-
-    function bucketEventsByMonth(startDate, months){
-      const map = new Map(); // key "YYYY-MM" => [events]
-      for (const ev of events){
-        const d = parseDateOr(ev.dateStr, null);
-        if (!d) continue;
-
-        // Only consider within projection window (start..start+months)
-        const end = addMonths(startDate, months);
-        if (d < startDate || d >= end) continue;
-
-        const k = monthKey(d);
-        if (!map.has(k)) map.set(k, []);
-        map.get(k).push(ev);
-      }
-      return map;
-    }
-
-    function simulateAdvanced({
-      startBalance,
-      startDate,
-      months,
-      baseAprPct,
-      inflationPct,
-      baseMonthlyContrib
-    }){
-      let balance = Math.max(0, startBalance);
-      let currentApr = Math.max(0, baseAprPct);
-      let currentMonthlyContrib = Math.max(0, baseMonthlyContrib);
+      // Baseline monthly contrib derived from freq
+      let monthlyContrib = freqToMonthly(baseContribAmount, baseContribFreq);
+      const inc = Math.max(0, Number(annualIncreasePct) || 0) / 100;
 
       const mInfl = annualToMonthlyInflation(inflationPct);
 
+      // Events bucketed by month
       const eventsByMonth = bucketEventsByMonth(startDate, months);
 
-      let totalContrib = 0;
-      let totalInterest = 0;
+      // Contribution pause handling
+      let paused = !!startPaused;
+      let pauseRemainingMonths = 0;
 
+      // Current running parameters (that events can change)
+      let currentApr = Math.max(0, Number(aprPct) || 0);
+      let currentMonthlyContrib = Math.max(0, monthlyContrib);
+
+      // Totals (nominal cash)
+      let totalContribNom = 0;
+      let totalInterestNom = 0;
+
+      // Totals in today's money (deflated as we go)
+      let totalContribReal = 0;
+
+      // Series
       const seriesNom = [];
       const seriesReal = [];
-      const seriesContrib = [];
+      const seriesContribNom = [];
 
-      let cumContrib = 0;
+      let cumContribNom = 0;
       let inflFactor = 1;
 
       for (let i = 0; i < months; i++){
-        const d = addMonths(startDate, i);
-        const k = monthKey(d);
+        const monthStart = addMonths(startDate, i);
+        const k = monthKey(monthStart);
+
+        // Apply yearly contribution increase (baseline behaviour) at year boundaries
+        // This affects currentMonthlyContrib *unless an event explicitly sets it* later.
+        if (i > 0 && i % 12 === 0 && inc > 0){
+          // Only apply to baseline; if events have set a new monthly amount, users usually still expect the raise on that amount.
+          currentMonthlyContrib = currentMonthlyContrib * (1 + inc);
+        }
 
         // Apply events at start of month
-        const evs = eventsByMonth.get(k) || [];
+        const evs = (eventsByMonth.get(k) || []).slice().sort((a,b)=>a.type.localeCompare(b.type));
         for (const ev of evs){
           const val = Number(ev.value) || 0;
 
           if (ev.type === 'oneoff_cash'){
             balance += val;
-            totalContrib += val;   // treat lump sum withdrawal as negative contribution
-            cumContrib += val;
+            totalContribNom += val;
+            cumContribNom += val;
+
+            // deflate this cash flow into today's money using current inflation factor AFTER update below?
+            // We treat it as happening at month start, so use current inflFactor.
+            totalContribReal += (inflFactor > 0) ? (val / inflFactor) : val;
           }
 
-          if (ev.type === 'ongoing_contrib_delta'){
+          if (ev.type === 'set_monthly_contrib'){
+            currentMonthlyContrib = Math.max(0, val);
+          }
+
+          if (ev.type === 'monthly_contrib_delta'){
             currentMonthlyContrib = Math.max(0, currentMonthlyContrib + val);
           }
 
           if (ev.type === 'rate_change'){
             currentApr = Math.max(0, val);
           }
+
+          if (ev.type === 'pause_contrib'){
+            pauseRemainingMonths = Math.max(0, Math.floor(val));
+            paused = pauseRemainingMonths > 0;
+          }
+
+          if (ev.type === 'resume_contrib'){
+            paused = false;
+            pauseRemainingMonths = 0;
+          }
         }
 
-        // Base monthly contribution
-        balance += currentMonthlyContrib;
-        totalContrib += currentMonthlyContrib;
-        cumContrib += currentMonthlyContrib;
+        // Contribution for this month (if not paused)
+        let contribThisMonth = 0;
+        if (!paused){
+          contribThisMonth = Math.max(0, currentMonthlyContrib);
+          balance += contribThisMonth;
+          totalContribNom += contribThisMonth;
+          cumContribNom += contribThisMonth;
 
-        // Interest for month based on current rate
-        const mRate = annualToMonthlyRate(currentApr);
-        const interest = balance * mRate;
+          totalContribReal += (inflFactor > 0) ? (contribThisMonth / inflFactor) : contribThisMonth;
+        }
+
+        // Interest
+        const interest = interestForMonth(balance, currentApr, compoundFreq, monthStart);
         balance += interest;
-        totalInterest += interest;
+        totalInterestNom += interest;
 
+        // Update inflation factor at end of month (for end-of-month value comparison)
         inflFactor *= (1 + mInfl);
         const realVal = (inflFactor > 0) ? (balance / inflFactor) : balance;
 
+        // Decrement pause timer after processing month
+        if (paused && pauseRemainingMonths > 0){
+          pauseRemainingMonths -= 1;
+          if (pauseRemainingMonths <= 0){
+            paused = false;
+          }
+        }
+
         seriesNom.push(round2(balance));
         seriesReal.push(round2(realVal));
-        seriesContrib.push(round2(cumContrib));
+        seriesContribNom.push(round2(cumContribNom));
       }
 
       const endDate = addMonths(startDate, months);
+
       return {
         finalNominal: round2(balance),
-        finalReal: round2(seriesReal[seriesReal.length-1] ?? 0),
-        totalContrib: round2(totalContrib),
-        totalInterest: round2(totalInterest),
-        seriesNom, seriesReal, seriesContrib,
+        finalReal: round2(seriesReal[seriesReal.length - 1] ?? 0),
+        totalContribNom: round2(totalContribNom),
+        totalContribReal: round2(totalContribReal),
+        totalInterestNom: round2(totalInterestNom),
+        seriesNom, seriesReal, seriesContribNom,
         endDate
       };
     }
 
-    // ---------- UI wiring ----------
-    const simpleTab = document.getElementById('simpleTab');
-    const advancedTab = document.getElementById('advancedTab');
-    const simplePanel = document.getElementById('simplePanel');
-    const advancedPanel = document.getElementById('advancedPanel');
+    // ---------------- snapshot table ----------------
+    function renderSnapshot(startDate, result, inflationPct){
+      const tb = document.getElementById('snapTbody');
 
-    let mode = 'simple';
+      const desiredYears = [1, 2, 5, 10, 15, 20, 25, 30, 40, 50];
+      const rows = [];
+      const monthsLen = result.seriesNom.length;
 
-    function setMode(m){
-      mode = m;
-      if (m === 'simple'){
-        simplePanel.style.display = 'block';
-        advancedPanel.style.display = 'none';
-        simpleTab.classList.remove('secondary');
-        advancedTab.classList.add('secondary');
+      // cumulative interest snapshot requires contribution series:
+      // interest earned at month i = balance - cumContrib (approx, ignores withdrawals in same metric but consistent with our seriesContribNom which includes them)
+      for (const y of desiredYears){
+        const idx = y * 12 - 1;
+        if (idx < 0 || idx >= monthsLen) continue;
+
+        const nom = result.seriesNom[idx];
+        const real = result.seriesReal[idx];
+        const contrib = result.seriesContribNom[idx];
+        const interestEarned = round2(nom - contrib);
+
+        rows.push(`
+          <tr>
+            <td>${y}</td>
+            <td>${GBP(nom)}</td>
+            <td>${GBP(real)}</td>
+            <td>${GBP(contrib)}</td>
+            <td>${GBP(interestEarned)}</td>
+          </tr>
+        `);
+      }
+
+      if (!rows.length){
+        tb.innerHTML = `<tr><td colspan="5" class="muted">Projection too short for snapshot years.</td></tr>`;
       } else {
-        simplePanel.style.display = 'none';
-        advancedPanel.style.display = 'block';
-        advancedTab.classList.remove('secondary');
-        simpleTab.classList.add('secondary');
+        tb.innerHTML = rows.join('');
       }
     }
 
-    simpleTab.addEventListener('click', (e) => { e.preventDefault(); setMode('simple'); });
-    advancedTab.addEventListener('click', (e) => { e.preventDefault(); setMode('advanced'); });
+    // ---------------- validation + UI ----------------
+    function validate(){
+      const startBalance = Number(document.getElementById('startBalance').value);
+      if (!(startBalance >= 0)) return 'Starting balance must be 0 or more.';
 
-    // Default dates
-    const today = new Date();
-    document.getElementById('startDate').value = toDateInputValue(today);
-    document.getElementById('eventDate').value = toDateInputValue(today);
+      const totalM = monthsTotal(Number(document.getElementById('years').value), Number(document.getElementById('months').value));
+      if (!(totalM > 0)) return 'Time period must be at least 1 month.';
 
-    // Event type help
+      const apr = Number(document.getElementById('rateApr').value);
+      if (!(apr >= 0)) return 'Interest rate cannot be negative.';
+
+      const infl = Number(document.getElementById('inflation').value);
+      if (!(infl >= 0)) return 'Inflation cannot be negative.';
+
+      const safeWR = Number(document.getElementById('safeWR').value);
+      if (!(safeWR >= 0)) return 'Withdrawal rate cannot be negative.';
+
+      // validate event dates
+      for (const ev of events){
+        const d = parseDateOr(ev.dateStr, null);
+        if (!d) return 'One of your event dates is invalid.';
+        if (ev.type === 'rate_change' && (Number(ev.value) || 0) < 0) return 'Event rate cannot be negative.';
+        if (ev.type === 'pause_contrib' && (Number(ev.value) || 0) < 0) return 'Pause months cannot be negative.';
+      }
+
+      return null;
+    }
+
+    function calculate(e){
+      e.preventDefault();
+      hideMsg();
+
+      const err = validate();
+      if (err){ showMsg(err, 'bad'); return; }
+
+      const startBalance = Number(document.getElementById('startBalance').value) || 0;
+      const startDate = parseDateOr(document.getElementById('startDate').value, new Date());
+
+      const totalM = monthsTotal(Number(document.getElementById('years').value), Number(document.getElementById('months').value));
+      const apr = Number(document.getElementById('rateApr').value) || 0;
+      const infl = Number(document.getElementById('inflation').value) || 0;
+
+      const compoundFreq = document.getElementById('compoundFreq').value;
+      const contribAmount = Number(document.getElementById('contribAmount').value) || 0;
+      const contribFreq = document.getElementById('contribFreq').value;
+
+      const annualIncrease = Number(document.getElementById('annualIncrease').value) || 0;
+      const paused = document.getElementById('contribPaused').checked;
+
+      const safeWR = Number(document.getElementById('safeWR').value) || 0;
+      const wr = safeWR / 100;
+
+      const result = simulate({
+        startBalance,
+        startDate,
+        months: totalM,
+        aprPct: apr,
+        inflationPct: infl,
+        compoundFreq,
+        baseContribAmount: contribAmount,
+        baseContribFreq: contribFreq,
+        annualIncreasePct: annualIncrease,
+        startPaused: paused
+      });
+
+      // KPIs
+      document.getElementById('finalNominal').textContent = GBP(result.finalNominal);
+      document.getElementById('finalReal').textContent = GBP(result.finalReal);
+      document.getElementById('endDateKpi').textContent = result.endDate.toLocaleDateString('en-GB', { year:'numeric', month:'short' });
+
+      document.getElementById('totalContribNom').textContent = GBP(result.totalContribNom);
+      document.getElementById('totalContribReal').textContent = GBP(result.totalContribReal);
+      document.getElementById('totalInterest').textContent = GBP(result.totalInterestNom);
+
+      const incomeNom = (wr > 0) ? (result.finalNominal * wr / 12) : 0;
+      const incomeReal = (wr > 0) ? (result.finalReal * wr / 12) : 0;
+      document.getElementById('incomeNom').textContent = GBP(round2(incomeNom));
+      document.getElementById('incomeReal').textContent = GBP(round2(incomeReal));
+
+      const netGainReal = round2(result.finalReal - result.totalContribReal);
+      document.getElementById('netGainReal').textContent = GBP(netGainReal);
+
+      // Chart
+      const labels = monthLabelsMMYY(startDate, totalM);
+      const view = document.getElementById('chartView').value;
+      const showContrib = document.getElementById('showContribLine').checked;
+
+      document.getElementById('results').style.display = 'block';
+      renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, view, showContrib);
+
+      // Snapshot
+      renderSnapshot(startDate, result, infl);
+
+      // Hook chart controls to re-render quickly
+      const chartView = document.getElementById('chartView');
+      const showContribLine = document.getElementById('showContribLine');
+
+      chartView.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, chartView.value, showContribLine.checked);
+      showContribLine.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, chartView.value, showContribLine.checked);
+    }
+
+    function reset(e){
+      e.preventDefault();
+      hideMsg();
+
+      document.getElementById('startBalance').value = 5000;
+      document.getElementById('startDate').value = toDateInputValue(new Date());
+      document.getElementById('years').value = 20;
+      document.getElementById('months').value = 0;
+      document.getElementById('rateApr').value = 7.00;
+      document.getElementById('compoundFreq').value = 'monthly';
+      document.getElementById('inflation').value = 2.50;
+      document.getElementById('safeWR').value = 4.0;
+
+      document.getElementById('contribAmount').value = 200;
+      document.getElementById('contribFreq').value = 'monthly';
+      document.getElementById('annualIncrease').value = 0;
+      document.getElementById('contribPaused').checked = false;
+
+      // events
+      events = [];
+      renderEventsTable();
+      document.getElementById('eventType').value = 'oneoff_cash';
+      document.getElementById('eventDate').value = toDateInputValue(new Date());
+      document.getElementById('eventValue').value = 1000;
+      helpForEventType('oneoff_cash');
+
+      // results
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('finalNominal').textContent = '—';
+      document.getElementById('finalReal').textContent = '—';
+      document.getElementById('endDateKpi').textContent = '—';
+      document.getElementById('totalContribNom').textContent = '—';
+      document.getElementById('totalContribReal').textContent = '—';
+      document.getElementById('totalInterest').textContent = '—';
+      document.getElementById('incomeNom').textContent = '—';
+      document.getElementById('incomeReal').textContent = '—';
+      document.getElementById('netGainReal').textContent = '—';
+
+      document.getElementById('snapTbody').innerHTML = `<tr><td colspan="5" class="muted">Calculate to see snapshot.</td></tr>`;
+
+      document.getElementById('chartView').value = 'both';
+      document.getElementById('showContribLine').checked = true;
+
+      if (chart) chart.destroy();
+    }
+
+    // ---------------- init wiring ----------------
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+    document.getElementById('resetBtn').addEventListener('click', reset);
+
+    // dates default
+    document.getElementById('startDate').value = toDateInputValue(new Date());
+    document.getElementById('eventDate').value = toDateInputValue(new Date());
+
+    // event help
     const eventTypeEl = document.getElementById('eventType');
     eventTypeEl.addEventListener('change', () => helpForEventType(eventTypeEl.value));
     helpForEventType(eventTypeEl.value);
@@ -676,11 +937,23 @@
       const value = Number(document.getElementById('eventValue').value);
 
       if (!dateStr){ showMsg('Please choose an event date.', 'bad'); return; }
-      if (!Number.isFinite(value)){ showMsg('Event value must be a number.', 'bad'); return; }
-      if (type === 'rate_change' && value < 0){ showMsg('Rate cannot be negative.', 'bad'); return; }
+
+      // value rules
+      if (type === 'resume_contrib'){
+        // ignore value
+      } else {
+        if (!Number.isFinite(value)){ showMsg('Event value must be a number.', 'bad'); return; }
+        if (type === 'rate_change' && value < 0){ showMsg('Rate cannot be negative.', 'bad'); return; }
+        if (type === 'pause_contrib' && value < 0){ showMsg('Pause months cannot be negative.', 'bad'); return; }
+      }
 
       const id = String(Date.now()) + Math.random().toString(16).slice(2);
-      events.push({ id, type, dateStr, value });
+      events.push({
+        id,
+        type,
+        dateStr,
+        value: (type === 'resume_contrib') ? 0 : value
+      });
 
       renderEventsTable();
     });
@@ -690,142 +963,6 @@
       events = [];
       renderEventsTable();
     });
-
-    function validateCommon(){
-      const startBalance = Number(document.getElementById('startBalance').value);
-      if (!(startBalance >= 0)) return 'Starting balance must be 0 or more.';
-
-      const years = Number(document.getElementById('years').value);
-      const months = Number(document.getElementById('months').value);
-      const totalM = monthsTotal(years, months);
-      if (!(totalM > 0)) return 'Time period must be at least 1 month.';
-
-      const apr = Number(document.getElementById('rateApr').value);
-      if (!(apr >= 0)) return 'Interest rate cannot be negative.';
-
-      const infl = Number(document.getElementById('inflation').value);
-      if (!(infl >= 0)) return 'Inflation cannot be negative.';
-
-      return null;
-    }
-
-    function calculate(e){
-      e.preventDefault();
-      hideMsg();
-
-      const err = validateCommon();
-      if (err){ showMsg(err, 'bad'); return; }
-
-      const startBalance = Number(document.getElementById('startBalance').value) || 0;
-      const startDate = parseDateOr(document.getElementById('startDate').value, new Date());
-      const totalM = monthsTotal(Number(document.getElementById('years').value), Number(document.getElementById('months').value));
-      const apr = Number(document.getElementById('rateApr').value) || 0;
-      const infl = Number(document.getElementById('inflation').value) || 0;
-
-      let result;
-
-      if (mode === 'simple'){
-        const contribAmount = Number(document.getElementById('contribAmount').value) || 0;
-        const contribFreq = document.getElementById('contribFreq').value;
-        const annualIncrease = Number(document.getElementById('annualIncrease').value) || 0;
-        const useIncrease = document.getElementById('useIncrease').checked;
-
-        result = simulateSimple({
-          startBalance,
-          startDate,
-          months: totalM,
-          aprPct: apr,
-          inflationPct: infl,
-          contribAmount,
-          contribFreq,
-          annualIncreasePct: annualIncrease,
-          useIncrease
-        });
-
-      } else {
-        const baseMonthlyContrib = Number(document.getElementById('baseMonthlyContrib').value) || 0;
-
-        // Sanity: if any event date is invalid, warn
-        for (const ev of events){
-          const d = parseDateOr(ev.dateStr, null);
-          if (!d){ showMsg('One of your event dates is invalid.', 'bad'); return; }
-        }
-
-        result = simulateAdvanced({
-          startBalance,
-          startDate,
-          months: totalM,
-          baseAprPct: apr,
-          inflationPct: infl,
-          baseMonthlyContrib
-        });
-      }
-
-      // KPIs
-      document.getElementById('finalNominal').textContent = GBP(result.finalNominal);
-      document.getElementById('finalReal').textContent = GBP(result.finalReal);
-      document.getElementById('totalContrib').textContent = GBP(result.totalContrib);
-
-      document.getElementById('totalInterest').textContent = GBP(result.totalInterest);
-
-      const realGain = result.finalReal - (result.totalContrib / Math.pow(1 + (infl/100), (totalM/12))); // rough “deflated contributions” comparator
-      document.getElementById('realGain').textContent = GBP(round2(realGain));
-
-      document.getElementById('endDateKpi').textContent = result.endDate.toLocaleDateString('en-GB', { year:'numeric', month:'short' });
-
-      // Chart
-      const labels = monthLabelsMMYY(startDate, totalM);
-      document.getElementById('results').style.display = 'block';
-      renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContrib);
-    }
-
-    function reset(e){
-      e.preventDefault();
-      hideMsg();
-
-      // common
-      document.getElementById('startBalance').value = 5000;
-      document.getElementById('startDate').value = toDateInputValue(new Date());
-      document.getElementById('rateApr').value = 7.00;
-      document.getElementById('inflation').value = 2.50;
-      document.getElementById('years').value = 20;
-      document.getElementById('months').value = 0;
-
-      // simple
-      document.getElementById('contribAmount').value = 200;
-      document.getElementById('contribFreq').value = 'monthly';
-      document.getElementById('annualIncrease').value = 0;
-      document.getElementById('useIncrease').checked = false;
-
-      // advanced
-      document.getElementById('baseMonthlyContrib').value = 200;
-      document.getElementById('eventType').value = 'oneoff_cash';
-      document.getElementById('eventDate').value = toDateInputValue(new Date());
-      document.getElementById('eventValue').value = 1000;
-      events = [];
-      renderEventsTable();
-      helpForEventType('oneoff_cash');
-
-      // results
-      document.getElementById('results').style.display = 'none';
-      document.getElementById('finalNominal').textContent = '—';
-      document.getElementById('finalReal').textContent = '—';
-      document.getElementById('totalContrib').textContent = '—';
-      document.getElementById('totalInterest').textContent = '—';
-      document.getElementById('realGain').textContent = '—';
-      document.getElementById('endDateKpi').textContent = '—';
-
-      if (chart) chart.destroy();
-
-      setMode('simple');
-    }
-
-    document.getElementById('calcBtn').addEventListener('click', calculate);
-    document.getElementById('resetBtn').addEventListener('click', reset);
-
-    // init
-    setMode('simple');
-    renderEventsTable();
   </script>
 </body>
 </html>
