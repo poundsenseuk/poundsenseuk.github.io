@@ -136,7 +136,7 @@
         <div class="callout">
           <div class="tag info">Advanced mode (optional)</div>
           <p class="small muted" style="margin:0;">
-            Use events for *changes* over time: lump sums, withdrawals, rate changes, contribution changes, pause/resume.
+            Use events for changes over time: lump sums, withdrawals, rate changes, contribution changes, pause/resume.
             If you don’t add events, this behaves like a normal compound interest calculator.
           </p>
         </div>
@@ -188,11 +188,12 @@
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Value</th>
-              <th>Effect</th>
-              <th></th>
+              <th>End of year</th>
+              <th>Nominal balance</th>
+              <th>Interest earned</th>
+              <th>Contributed (year)</th>
+              <th>Total contributed</th>
+              <th>Balance (today’s money)</th>
             </tr>
           </thead>
           <tbody id="eventsTbody">
@@ -564,7 +565,7 @@
 
       const dsNom = { label: 'Balance (nominal £)', data: nominal, tension: 0.25, hidden: (view === 'real') };
       const dsReal = { label: 'Balance (today’s money £)', data: real, tension: 0.25, hidden: (view === 'nominal') };
-      const dsCon = { label: 'Total contributed (£)', data: contribNom, tension: 0.15, hidden: !showContrib };
+      const dsCon = { label: 'Total in (starting + contributions) (£)', data: contribNom, tension: 0.15, hidden: !showContrib };
 
       chart = new Chart(ctx, {
         type: 'line',
@@ -633,8 +634,13 @@
       const seriesReal = [];
       const seriesContribNom = [];
 
-      let cumContribNom = 0;
+      let cumContribNom = balance;          // start contributed line at starting balance
       let inflFactor = 1;
+      
+      // optional: treat starting balance as "already contributed" in totals too
+      totalContribNom += balance;
+      totalContribReal += balance;          // at t=0 inflation factor = 1
+
 
       for (let i = 0; i < months; i++){
         const monthStart = addMonths(startDate, i);
@@ -732,33 +738,48 @@
     }
 
     // ---------------- snapshot table ----------------
-    function renderSnapshot(startDate, result, inflationPct){
-      const tb = document.getElementById('snapTbody');
-
-      const desiredYears = [1, 2, 5, 10, 15, 20, 25, 30, 40, 50];
-      const rows = [];
-      const monthsLen = result.seriesNom.length;
-
-      // cumulative interest snapshot requires contribution series:
-      // interest earned at month i = balance - cumContrib (approx, ignores withdrawals in same metric but consistent with our seriesContribNom which includes them)
-      for (const y of desiredYears){
-        const idx = y * 12 - 1;
-        if (idx < 0 || idx >= monthsLen) continue;
-
-        const nom = result.seriesNom[idx];
-        const real = result.seriesReal[idx];
-        const contrib = result.seriesContribNom[idx];
-        const interestEarned = round2(nom - contrib);
-
-        rows.push(`
-          <tr>
-            <td>${y}</td>
-            <td>${GBP(nom)}</td>
-            <td>${GBP(real)}</td>
-            <td>${GBP(contrib)}</td>
-            <td>${GBP(interestEarned)}</td>
-          </tr>
-        `);
+    function renderSnapshot(startDate, result){
+        const tb = document.getElementById('snapTbody');
+      
+        const monthsLen = result.seriesNom.length;
+        if (monthsLen <= 0){
+          tb.innerHTML = `<tr><td colspan="6" class="muted">No data.</td></tr>`;
+          return;
+        }
+      
+        // We assume seriesContribNom is cumulative "total paid in" (including starting balance if you baseline it)
+        // Yearly contributed = change in seriesContribNom over that year (excluding any starting balance already baked in)
+        const rows = [];
+        const nYears = Math.ceil(monthsLen / 12);
+      
+        let prevTotalContrib = 0;
+      
+        for (let y = 1; y <= nYears; y++){
+          const idx = Math.min(y * 12 - 1, monthsLen - 1); // end of year or end of projection
+      
+          const nomBal = result.seriesNom[idx] ?? 0;
+          const realBal = result.seriesReal[idx] ?? 0;
+      
+          const totalContrib = result.seriesContribNom[idx] ?? 0; // cumulative paid in (baseline + flows)
+          const contributedYear = totalContrib - prevTotalContrib;
+      
+          const interestEarned = nomBal - totalContrib; // since balance = contributions + interest (with withdrawals already netted into totalContrib)
+      
+          rows.push(`
+            <tr>
+              <td>Year ${y}</td>
+              <td>${GBP(nomBal)}</td>
+              <td>${GBP(round2(interestEarned))}</td>
+              <td>${GBP(round2(contributedYear))}</td>
+              <td>${GBP(round2(totalContrib))}</td>
+              <td>${GBP(realBal)}</td>
+            </tr>
+          `);
+      
+          prevTotalContrib = totalContrib;
+        }
+      
+        tb.innerHTML = rows.join('');
       }
 
       if (!rows.length){
@@ -859,7 +880,7 @@
       renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, view, showContrib);
 
       // Snapshot
-      renderSnapshot(startDate, result, infl);
+      renderSnapshot(startDate, result);
 
       // Hook chart controls to re-render quickly
       const chartView = document.getElementById('chartView');
