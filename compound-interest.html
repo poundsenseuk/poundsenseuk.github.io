@@ -739,45 +739,57 @@
 
     // ---------------- snapshot table ----------------
     function renderSnapshot(startDate, result){
-    const tb = document.getElementById('snapTbody');
-    const monthsLen = result.seriesNom.length;
-  
-    if (monthsLen <= 0){
-      tb.innerHTML = `<tr><td colspan="6" class="muted">No data.</td></tr>`;
-      return;
+      const tb = document.getElementById('snapTbody');
+      const monthsLen = result.seriesNom.length;
+    
+      if (monthsLen <= 0){
+        tb.innerHTML = `<tr><td colspan="6" class="muted">No data.</td></tr>`;
+        return;
+      }
+    
+      const rows = [];
+      const nYears = Math.ceil(monthsLen / 12);
+      
+      const startBaseline = (result.seriesContribNom[0] ?? 0); // this includes starting balance + first month's contrib
+      // Better baseline is the raw starting balance (use the input), but we don't have it here. So pass it in OR infer it.
+      let prevTotalContrib = 0;
+    
+      for (let y = 1; y <= nYears; y++){
+        const idx = Math.min(y * 12 - 1, monthsLen - 1);
+    
+        const nomBal = result.seriesNom[idx] ?? 0;
+        const realBal = result.seriesReal[idx] ?? 0;
+    
+        const totalContrib = result.seriesContribNom[idx] ?? 0;
+        // Yearly contributed should exclude the starting balance (one-time baseline)
+        let contributedYear = totalContrib - prevTotalContrib;
+      
+        if (y === 1){
+          // Remove starting balance from the first year's "contributed"
+          const startingBalance = Number(document.getElementById('startBalance').value) || 0;
+          contributedYear -= startingBalance;
+        }
+      
+        contributedYear = round2(contributedYear);
+    
+        const interestEarned = nomBal - totalContrib;
+    
+        rows.push(`
+          <tr>
+            <td>Year ${y}</td>
+            <td>${GBP(nomBal)}</td>
+            <td>${GBP(round2(interestEarned))}</td>
+            <td>${GBP(round2(contributedYear))}</td>
+            <td>${GBP(round2(totalContrib))}</td>
+            <td>${GBP(realBal)}</td>
+          </tr>
+        `);
+    
+        prevTotalContrib = totalContrib;
+      }
+    
+      tb.innerHTML = rows.join('');
     }
-  
-    const rows = [];
-    const nYears = Math.ceil(monthsLen / 12);
-    let prevTotalContrib = 0;
-  
-    for (let y = 1; y <= nYears; y++){
-      const idx = Math.min(y * 12 - 1, monthsLen - 1);
-  
-      const nomBal = result.seriesNom[idx] ?? 0;
-      const realBal = result.seriesReal[idx] ?? 0;
-  
-      const totalContrib = result.seriesContribNom[idx] ?? 0;
-      const contributedYear = totalContrib - prevTotalContrib;
-  
-      const interestEarned = nomBal - totalContrib;
-  
-      rows.push(`
-        <tr>
-          <td>Year ${y}</td>
-          <td>${GBP(nomBal)}</td>
-          <td>${GBP(round2(interestEarned))}</td>
-          <td>${GBP(round2(contributedYear))}</td>
-          <td>${GBP(round2(totalContrib))}</td>
-          <td>${GBP(realBal)}</td>
-        </tr>
-      `);
-  
-      prevTotalContrib = totalContrib;
-    }
-  
-    tb.innerHTML = rows.join('');
-  }
 
 
     // ---------------- validation + UI ----------------
