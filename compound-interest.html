@@ -283,9 +283,9 @@
           <div class="tag info">Chart view</div>
           <div class="inline" style="margin-top:8px;">
             <select id="chartView" style="padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(11,15,20,.55);color:var(--text);">
-              <option value="both" selected>Nominal + Today’s money</option>
-              <option value="nominal">Nominal only</option>
-              <option value="real">Today’s money only</option>
+              <option value="nominal" selected>Nominal (recommended)</option>
+              <option value="real">Today’s money</option>
+              <option value="both">Both (4 lines)</option>
             </select>
             <label class="check">
               <input id="showContribLine" type="checkbox" checked />
@@ -559,17 +559,22 @@
       return labels;
     }
 
-    function renderChart(labels, nominal, real, contribNom, view, showContrib){
+    function renderChart(labels, nominal, real, contribNom, contribReal, view, showContrib){
       const ctx = document.getElementById('chart');
       if (chart) chart.destroy();
 
-      const dsNom = { label: 'Balance (nominal £)', data: nominal, tension: 0.25, hidden: (view === 'real') };
-      const dsReal = { label: 'Balance (today’s money £)', data: real, tension: 0.25, hidden: (view === 'nominal') };
-      const dsCon = { label: 'Total in (starting + contributions) (£)', data: contribNom, tension: 0.15, hidden: !showContrib };
+      const showNom = (view === 'nominal' || view === 'both');
+      const showReal = (view === 'real' || view === 'both');
+      
+      const dsNomBal = { label: 'Balance (nominal £)', data: nominal, tension: 0.25, hidden: !showNom };
+      const dsNomCon = { label: 'Total in (nominal £)', data: contribNom, tension: 0.15, hidden: !showNom || !showContrib };
+      
+      const dsRealBal = { label: 'Balance (today’s money £)', data: real, tension: 0.25, hidden: !showReal };
+      const dsRealCon = { label: 'Total in (today’s money £)', data: contribReal, tension: 0.15, hidden: !showReal || !showContrib };
 
       chart = new Chart(ctx, {
         type: 'line',
-        data: { labels, datasets: [dsNom, dsReal, dsCon] },
+        data: { labels, datasets: [dsNomBal, dsNomCon, dsRealBal, dsRealCon] },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -633,9 +638,11 @@
       const seriesNom = [];
       const seriesReal = [];
       const seriesContribNom = [];
+      const seriesContribReal = [];
 
       let cumContribNom = balance;          // start contributed line at starting balance
       let inflFactor = 1;
+      let cumContribReal = balance; // starting balance in today's money at t=0
       
       // optional: treat starting balance as "already contributed" in totals too
       totalContribNom += balance;
@@ -666,6 +673,7 @@
             // deflate this cash flow into today's money using current inflation factor AFTER update below?
             // We treat it as happening at month start, so use current inflFactor.
             totalContribReal += (inflFactor > 0) ? (val / inflFactor) : val;
+            cumContribReal += (inflFactor > 0) ? (val / inflFactor) : val;
           }
 
           if (ev.type === 'set_monthly_contrib'){
@@ -700,6 +708,7 @@
           cumContribNom += contribThisMonth;
 
           totalContribReal += (inflFactor > 0) ? (contribThisMonth / inflFactor) : contribThisMonth;
+          cumContribReal += (inflFactor > 0) ? (contribThisMonth / inflFactor) : contribThisMonth;
         }
 
         // Interest
@@ -722,6 +731,7 @@
         seriesNom.push(round2(balance));
         seriesReal.push(round2(realVal));
         seriesContribNom.push(round2(cumContribNom));
+        seriesContribReal.push(round2(cumContribReal));
       }
 
       const endDate = addMonths(startDate, months);
@@ -732,7 +742,7 @@
         totalContribNom: round2(totalContribNom),
         totalContribReal: round2(totalContribReal),
         totalInterestNom: round2(totalInterestNom),
-        seriesNom, seriesReal, seriesContribNom,
+        seriesNom, seriesReal, seriesContribNom, seriesContribReal,
         endDate
       };
     }
@@ -880,8 +890,16 @@
       const showContrib = document.getElementById('showContribLine').checked;
 
       document.getElementById('results').style.display = 'block';
-      renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, view, showContrib);
-
+      renderChart(
+        labels,
+        result.seriesNom,
+        result.seriesReal,
+        result.seriesContribNom,
+        result.seriesContribReal,
+        view,
+        showContrib
+      );
+      
       // Snapshot
       renderSnapshot(startDate, result);
 
@@ -889,8 +907,8 @@
       const chartView = document.getElementById('chartView');
       const showContribLine = document.getElementById('showContribLine');
 
-      chartView.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, chartView.value, showContribLine.checked);
-      showContribLine.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, chartView.value, showContribLine.checked);
+      chartView.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, result.seriesContribReal, chartView.value, showContribLine.checked);
+      showContribLine.onchange = () => renderChart(labels, result.seriesNom, result.seriesReal, result.seriesContribNom, result.seriesContribReal, chartView.value, showContribLine.checked);
     }
 
     function reset(e){
