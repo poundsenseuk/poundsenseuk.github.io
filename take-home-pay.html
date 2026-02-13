@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PoundSenseUK – Take-Home Pay Calculator (UK)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Take-Home Pay Calculator (UK)</h1>
+      <p class="sub">
+        Estimate your net pay with UK tax, NI, student loans, pension options, salary sacrifice, benefits, and working pattern adjustments.
+      </p>
+
+      <div class="pillrow">
+        <span class="pill">Anonymous</span>
+        <span class="pill">Client-side only</span>
+        <span class="pill">Easy tax-year updates</span>
+      </div>
+
+      <div class="pillrow">
+        <a href="https://poundsenseuk.github.io"><span class="pill">Go To Home</span></a>
+      </div>
+    </header>
+
+    <!-- INPUTS -->
+    <div class="card">
+      <h2>Inputs</h2>
+      <div id="msg" class="alert warn" style="display:none;"></div>
+
+      <!-- Core (compact) -->
+      <div class="formgrid">
+        <div class="field">
+          <label for="salary">Salary (gross)</label>
+          <input id="salary" type="number" min="0" step="100" value="35000" />
+          <p class="help">Your base pay before deductions.</p>
+        </div>
+
+        <div class="field">
+          <label for="salaryFreq">Salary frequency</label>
+          <select id="salaryFreq">
+            <option value="annual" selected>Annual</option>
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily (workday)</option>
+          </select>
+          <p class="help">If not annual, we annualise it.</p>
+        </div>
+
+        <div class="field">
+          <label for="taxYear">Tax year rules</label>
+          <select id="taxYear">
+            <option value="2025_26" selected>2025/26 (6 Apr 2025 – 5 Apr 2026)</option>
+          </select>
+          <p class="help">Update the rules object yearly. (See JS section.)</p>
+        </div>
+
+        <div class="field">
+          <label for="taxCode">Tax code</label>
+          <input id="taxCode" type="text" value="1257L" />
+          <p class="help">Examples: 1257L, BR, D0, D1, 0T, K500, 1257L M1.</p>
+        </div>
+
+        <div class="field">
+          <label class="check" style="margin-top:22px;">
+            <input id="isScotland" type="checkbox" />
+            I pay Scottish Income Tax
+          </label>
+          <p class="help">Uses Scottish bands for income tax only.</p>
+        </div>
+
+        <div class="field">
+          <label class="check" style="margin-top:22px;">
+            <input id="noNI" type="checkbox" />
+            Do not pay National Insurance
+          </label>
+          <p class="help">Rare cases only. Otherwise leave off.</p>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <!-- Compact collapsibles -->
+      <div class="callouts callouts--single" style="margin-top:10px;">
+        <div class="callout">
+          <div class="tag info">Optional sections</div>
+          <p class="small muted" style="margin:0;">
+            Expand only what you need. The calculator stays “simple by default”.
+          </p>
+        </div>
+      </div>
+
+      <!-- Extra pay -->
+      <details class="card" style="margin-top:12px; padding:14px; background: rgba(255,255,255,.02);">
+        <summary style="cursor:pointer; font-weight:800;">Extra pay (bonus, overtime, allowances)</summary>
+        <div class="hr"></div>
+
+        <div class="formgrid">
+          <div class="field">
+            <label for="bonus">Bonus (gross, annualised)</label>
+            <input id="bonus" type="number" min="0" step="50" value="0" />
+            <p class="help">If you get a one-off bonus, enter its annual amount.</p>
+          </div>
+
+          <div class="field">
+            <label for="overtime">Overtime / additional pay (annualised)</label>
+            <input id="overtime" type="number" min="0" step="50" value="0" />
+            <p class="help">Commission, overtime, shift premia (annual total).</p>
+          </div>
+
+          <div class="field">
+            <label for="cashAllowances">Taxable cash allowances (annual)</label>
+            <input id="cashAllowances" type="number" min="0" step="50" value="0" />
+            <p class="help">E.g. car allowance paid as cash. Usually subject to NI too.</p>
+          </div>
+
+          <div class="field">
+            <label for="benefitsInKind">Taxable benefits in kind (annual)</label>
+            <input id="benefitsInKind" type="number" min="0" step="50" value="0" />
+            <p class="help">E.g. company car benefit value. Often taxed via PAYE; NI treatment varies.</p>
+          </div>
+
+          <div class="field">
+            <label class="check" style="margin-top:22px;">
+              <input id="benefitsApplyNI" type="checkbox" />
+              Apply NI to benefits/allowances (approx)
+            </label>
+            <p class="help">Cash allowances usually yes; benefits in kind often no for employee NI. Toggle for a rough model.</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- Pension + sacrifice -->
+      <details class="card" style="margin-top:12px; padding:14px; background: rgba(255,255,255,.02);">
+        <summary style="cursor:pointer; font-weight:800;">Pension, salary sacrifice & childcare vouchers</summary>
+        <div class="hr"></div>
+
+        <div class="formgrid">
+          <div class="field">
+            <label for="pensionMethod">Pension method</label>
+            <select id="pensionMethod">
+              <option value="none" selected>None</option>
+              <option value="net_pay">Net Pay (pre-tax)</option>
+              <option value="relief_at_source">Relief at Source (post-tax, provider adds 20%)</option>
+              <option value="salary_sacrifice">Salary Sacrifice (pre-tax & pre-NI)</option>
+            </select>
+            <p class="help">Most workplace schemes are Net Pay or Salary Sacrifice. Many personal pensions are Relief at Source.</p>
+          </div>
+
+          <div class="field">
+            <label for="pensionInputType">Pension input type</label>
+            <select id="pensionInputType">
+              <option value="percent" selected>Percent of (eligible) pay</option>
+              <option value="amount">Fixed £ amount (annual)</option>
+            </select>
+            <p class="help">If percent, we apply it to your gross “earnings for calc”.</p>
+          </div>
+
+          <div class="field">
+            <label for="pensionValue">Pension contribution</label>
+            <input id="pensionValue" type="number" min="0" step="0.1" value="5" />
+            <p class="help">Percent or annual £ depending on the dropdown.</p>
+          </div>
+
+          <div class="field">
+            <label for="salarySacrificeOther">Other salary sacrifice (annual)</label>
+            <input id="salarySacrificeOther" type="number" min="0" step="50" value="0" />
+            <p class="help">E.g. bike, tech scheme. Reduces tax & NI in most cases.</p>
+          </div>
+
+          <div class="field">
+            <label for="childcareVouchers">Childcare vouchers (annual)</label>
+            <input id="childcareVouchers" type="number" min="0" step="50" value="0" />
+            <p class="help">Legacy schemes only. Often salary sacrifice style.</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- Student loan -->
+      <details class="card" style="margin-top:12px; padding:14px; background: rgba(255,255,255,.02);">
+        <summary style="cursor:pointer; font-weight:800;">Student loans</summary>
+        <div class="hr"></div>
+
+        <div class="formgrid">
+          <div class="field">
+            <label for="slPlan">Student loan plan</label>
+            <select id="slPlan">
+              <option value="none" selected>None</option>
+              <option value="plan1">Plan 1</option>
+              <option value="plan2">Plan 2</option>
+              <option value="plan4">Plan 4</option>
+              <option value="plan5">Plan 5</option>
+              <option value="multi_lowest">Multiple plans (use lowest threshold)</option>
+            </select>
+            <p class="help">If you have multiple (not postgrad), repayments use the lowest threshold.</p>
+          </div>
+
+          <div class="field">
+            <label class="check" style="margin-top:22px;">
+              <input id="hasPgl" type="checkbox" />
+              Also repaying a Postgraduate Loan
+            </label>
+            <p class="help">Postgrad is additional (6% over its own threshold).</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- Other adjustments -->
+      <details class="card" style="margin-top:12px; padding:14px; background: rgba(255,255,255,.02);">
+        <summary style="cursor:pointer; font-weight:800;">Other adjustments (allowances, work pattern, extra deductions)</summary>
+        <div class="hr"></div>
+
+        <div class="formgrid">
+          <div class="field">
+            <label class="check" style="margin-top:22px;">
+              <input id="blindAllowance" type="checkbox" />
+              Blind Person’s Allowance
+            </label>
+            <p class="help">Adds an extra allowance to your tax-free amount (if eligible).</p>
+          </div>
+
+          <div class="field">
+            <label for="otherPreTaxDed">Other deductions (pre-tax, annual)</label>
+            <input id="otherPreTaxDed" type="number" min="0" step="50" value="0" />
+            <p class="help">E.g. professional fees via payroll (rare). Reduces taxable pay.</p>
+          </div>
+
+          <div class="field">
+            <label for="otherPostTaxDed">Other deductions (post-tax, annual)</label>
+            <input id="otherPostTaxDed" type="number" min="0" step="50" value="0" />
+            <p class="help">E.g. union dues not salary sacrificed. Taken after net pay.</p>
+          </div>
+
+          <div class="field">
+            <label for="daysPerWeek">Work days per week</label>
+            <input id="daysPerWeek" type="number" min="1" max="7" step="1" value="5" />
+            <p class="help">Used only if salary frequency is “Daily”.</p>
+          </div>
+
+          <div class="field">
+            <label for="weeksPerYear">Work weeks per year</label>
+            <input id="weeksPerYear" type="number" min="1" max="52" step="1" value="52" />
+            <p class="help">Used only if salary frequency is “Daily”.</p>
+          </div>
+        </div>
+      </details>
+
+      <div class="hr"></div>
+
+      <div class="inline" style="margin-top:12px;">
+        <a class="btn" href="#" id="calcBtn">Calculate</a>
+        <a class="btn secondary" href="#" id="resetBtn">Reset</a>
+      </div>
+
+      <p class="note" style="margin-top:14px;">
+        <b>Disclaimer:</b> Estimates only, not tax advice. PAYE can differ due to pay timing, cumulative codes, benefits processing, Scottish/Welsh specifics, and employer payroll rules.
+      </p>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="card" id="results" style="margin-top:14px; display:none;">
+      <h2>Results</h2>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Take-home pay (annual)</div>
+          <div class="value" id="netAnnual">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Take-home pay (monthly)</div>
+          <div class="value" id="netMonthly">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Effective tax+NI rate</div>
+          <div class="value" id="effRate">—</div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Income tax</div>
+          <div class="value" id="taxOut">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">National Insurance</div>
+          <div class="value" id="niOut">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Student loans</div>
+          <div class="value" id="slOut">—</div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Pension (employee)</div>
+          <div class="value" id="pensionOut">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Salary sacrifice total</div>
+          <div class="value" id="sacOut">—</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Gross (annualised)</div>
+          <div class="value" id="grossOut">—</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <h2 style="margin-top:0;">Breakdown</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Line item</th>
+              <th>Annual</th>
+              <th>Monthly</th>
+              <th class="muted">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="breakdownTbody">
+            <tr><td colspan="4" class="muted">Calculate to see breakdown.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      <p class="disclosure">Affiliate disclosure: Some outbound links may be affiliate links at no extra cost to you.</p>
+      <p class="note">© PoundSenseUK — calculators are estimates, not advice.</p>
+    </footer>
+  </div>
+
+  <script>
+    // =========================================================
+    //  UK TAKE-HOME PAY CALCULATOR
+    //  Design goal: update tax year by editing TAX_RULES only.
+    // =========================================================
+
+    // ---------- helpers ----------
+    const GBP = (x) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(x);
+    const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+    const clamp0 = (x) => Math.max(0, Number(x) || 0);
+
+    const msg = document.getElementById('msg');
+    function showMsg(text, kind='warn'){
+      msg.className = `alert ${kind}`;
+      msg.textContent = text;
+      msg.style.display = 'block';
+    }
+    function hideMsg(){ msg.style.display = 'none'; }
+
+    // ---------- TAX YEAR RULES (EDIT THIS EACH YEAR) ----------
+    // Sources used for defaults:
+    // - Income tax bands & PAYE thresholds 2025/26 (UK & Scotland): gov.uk employer thresholds page & Scottish income tax pages.
+    // - Student loan thresholds: gov.uk "What you pay".
+    // - NI thresholds: gov.uk "Rates and allowances: National Insurance contributions".
+    const TAX_RULES = {
+      "2025_26": {
+        label: "2025/26",
+        personalAllowanceDefault: 12570,
+        personalAllowanceTaperStart: 100000,
+        personalAllowanceTaperEnd: 125140, // where PA is effectively 0 under taper
+        blindPersonsAllowance: 3130, // annual (approx; adjust if tax year changes)
+
+        incomeTax: {
+          rUK: [ // England/Wales/NI (aka rUK for this tool)
+            { upTo: 50270, rate: 0.20, name: "Basic" },        // taxable up to 50,270
+            { upTo: 125140, rate: 0.40, name: "Higher" },      // taxable up to 125,140
+            { upTo: Infinity, rate: 0.45, name: "Additional" } // above
+          ],
+          scotland: [
+            { upTo: 15397, rate: 0.19, name: "Starter" },      // taxable up to 15,397
+            { upTo: 27491, rate: 0.20, name: "Basic" },        // taxable up to 27,491
+            { upTo: 43662, rate: 0.21, name: "Intermediate" }, // taxable up to 43,662
+            { upTo: 75000, rate: 0.42, name: "Higher" },       // taxable up to 75,000
+            { upTo: 125140, rate: 0.45, name: "Advanced" },    // taxable up to 125,140
+            { upTo: Infinity, rate: 0.48, name: "Top" }        // above
+          ]
+        },
+
+        // Employee NI (Class 1) simplified annualised approach
+        // 2025/26: PT £12,570; UEL £50,270; main 8%, upper 2%
+        niEmployee: {
+          primaryThreshold: 12570,
+          upperEarningsLimit: 50270,
+          rateMain: 0.08,
+          rateUpper: 0.02
+        },
+
+        studentLoan: {
+          // thresholds are annual (we annualise pay then apply)
+          plan1: { threshold: 26065, rate: 0.09, label: "Plan 1" },
+          plan2: { threshold: 28470, rate: 0.09, label: "Plan 2" },
+          plan4: { threshold: 32745, rate: 0.09, label: "Plan 4" },
+          plan5: { threshold: 25000, rate: 0.09, label: "Plan 5" },
+          postgrad: { threshold: 21000, rate: 0.06, label: "Postgraduate Loan" }
+        }
+      }
+    };
+
+    function getRules(){
+      const key = document.getElementById('taxYear').value;
+      return TAX_RULES[key] || TAX_RULES["2025_26"];
+    }
+
+    // ---------- Tax code parsing ----------
+    // We aim for: usable estimates and easy extension.
+    // Common cases:
+    // - 1257L => PA = 1257*10
+    // - 0T => no PA
+    // - BR => all at basic rate (ignore PA)
+    // - D0 => all at higher rate
+    // - D1 => all at additional rate
+    // - Kxxx => negative allowance (adds to taxable)
+    // Emergency markers: M1/W1/X (we ignore period-specific and treat annualised)
+    function parseTaxCode(raw){
+      const s = String(raw || "").trim().toUpperCase().replace(/\s+/g, " ");
+      const parts = s.split(" ");
+      const code = parts[0] || "";
+      const flags = parts.slice(1); // e.g. M1 / W1 / X
+
+      const isEmergency = flags.some(f => ["M1","W1","X"].includes(f));
+
+      // Special flat-rate codes
+      if (["BR","D0","D1","NT"].includes(code)){
+        return { kind: "flat", code, isEmergency };
+      }
+
+      // 0T
+      if (code === "0T"){
+        return { kind: "allowance", allowance: 0, negativeAllowance: 0, code, isEmergency };
+      }
+
+      // K codes: negative allowance => increases taxable pay by that amount
+      if (code.startsWith("K")){
+        const n = parseInt(code.slice(1), 10);
+        const neg = Number.isFinite(n) ? (n * 10) : 0;
+        return { kind: "allowance", allowance: 0, negativeAllowance: neg, code, isEmergency };
+      }
+
+      // Standard numeric + suffix (e.g. 1257L)
+      const m = code.match(/^(\d{1,4})([A-Z])$/);
+      if (m){
+        const num = parseInt(m[1], 10);
+        const allowance = Number.isFinite(num) ? (num * 10) : 0;
+        return { kind: "allowance", allowance, negativeAllowance: 0, code, isEmergency };
+      }
+
+      // Fallback: treat as standard allowance (rules default)
+      return { kind: "unknown", code, isEmergency };
+    }
+
+    // ---------- Annualise salary ----------
+    function annualiseSalary(amount, freq){
+      const a = clamp0(amount);
+      switch(freq){
+        case "monthly": return a * 12;
+        case "weekly":  return a * 52.1775; // average weeks/year
+        case "daily": {
+          const d = clamp0(document.getElementById('daysPerWeek').value || 5);
+          const w = clamp0(document.getElementById('weeksPerYear').value || 52);
+          return a * d * w;
+        }
+        case "annual":
+        default: return a;
+      }
+    }
+
+    // ---------- Income tax ----------
+    // We compute taxable income = max(0, adjustedPay - personalAllowance + negativeAllowance)
+    // Then apply progressive bands (rUK or Scotland).
+    function computePersonalAllowance(rules, parsedTaxCode, adjustedNetIncome, hasBlindAllowance){
+      // Flat tax codes ignore PA concept in PAYE reality; we treat them separately.
+      if (parsedTaxCode.kind === "flat"){
+        return { allowance: 0, neg: 0, mode: parsedTaxCode.code };
+      }
+
+      // Base allowance:
+      let pa = rules.personalAllowanceDefault;
+
+      // If tax code explicitly sets allowance (e.g. 1257L, 0T), use it.
+      if (parsedTaxCode.kind === "allowance"){
+        pa = parsedTaxCode.allowance;
+      }
+
+      // Blind Person’s Allowance (if eligible)
+      if (hasBlindAllowance){
+        pa += (rules.blindPersonsAllowance || 0);
+      }
+
+      // PA taper for high income (based on adjusted net income in UK system)
+      // Reduce £1 for every £2 over taper start.
+      const start = rules.personalAllowanceTaperStart;
+      if (adjustedNetIncome > start){
+        const reduction = Math.floor((adjustedNetIncome - start) / 2);
+        pa = Math.max(0, pa - reduction);
+      }
+
+      // Negative allowance from K code:
+      const neg = clamp0(parsedTaxCode.negativeAllowance || 0);
+
+      return { allowance: pa, neg, mode: "standard" };
+    }
+
+    function applyProgressiveTax(taxable, bands){
+      let remaining = Math.max(0, taxable);
+      let lastCap = 0;
+      let tax = 0;
+      const lines = [];
+
+      for (const b of bands){
+        const cap = b.upTo;
+        const slice = Math.max(0, Math.min(remaining, cap - lastCap));
+        const sliceTax = slice * b.rate;
+        if (slice > 0){
+          lines.push({ name: b.name, amount: slice, rate: b.rate, tax: sliceTax });
+        }
+        tax += sliceTax;
+        remaining -= slice;
+        lastCap = cap;
+        if (remaining <= 0) break;
+      }
+      return { tax: round2(tax), lines };
+    }
+
+    function computeIncomeTax(rules, isScotland, taxableIncome, parsedTaxCode){
+      // Flat tax codes:
+      if (parsedTaxCode.kind === "flat"){
+        const code = parsedTaxCode.code;
+        if (code === "NT") return { tax: 0, lines: [{name:"NT", amount: taxableIncome, rate: 0, tax: 0}] };
+
+        // BR: all at 20% (rUK basic)
+        if (code === "BR") return { tax: round2(taxableIncome * 0.20), lines: [{name:"BR", amount: taxableIncome, rate: 0.20, tax: taxableIncome * 0.20}] };
+
+        // D0: all at 40%
+        if (code === "D0") return { tax: round2(taxableIncome * 0.40), lines: [{name:"D0", amount: taxableIncome, rate: 0.40, tax: taxableIncome * 0.40}] };
+
+        // D1: all at 45%
+        if (code === "D1") return { tax: round2(taxableIncome * 0.45), lines: [{name:"D1", amount: taxableIncome, rate: 0.45, tax: taxableIncome * 0.45}] };
+
+        // fallback
+        return { tax: 0, lines: [{name:"Flat code", amount: taxableIncome, rate: 0, tax: 0}] };
+      }
+
+      const bands = isScotland ? rules.incomeTax.scotland : rules.incomeTax.rUK;
+      return applyProgressiveTax(taxableIncome, bands);
+    }
+
+    // ---------- National Insurance (employee, annualised) ----------
+    function computeNI(rules, niEarnings, noNI){
+      if (noNI) return 0;
+
+      const t = rules.niEmployee.primaryThreshold;
+      const u = rules.niEmployee.upperEarningsLimit;
+      const r1 = rules.niEmployee.rateMain;
+      const r2 = rules.niEmployee.rateUpper;
+
+      const e = Math.max(0, niEarnings);
+
+      const mainSlice = Math.max(0, Math.min(e, u) - t);
+      const upperSlice = Math.max(0, e - u);
+
+      return round2(mainSlice * r1 + upperSlice * r2);
+    }
+
+    // ---------- Student loans ----------
+    function computeStudentLoans(rules, repaymentIncome, planKey, hasPgl){
+      const sl = rules.studentLoan;
+      const income = Math.max(0, repaymentIncome);
+
+      let mainRepay = 0;
+      let pglRepay = 0;
+
+      if (planKey && planKey !== "none"){
+        let threshold = null;
+        let rate = 0.09;
+        let label = "";
+
+        if (planKey === "multi_lowest"){
+          threshold = Math.min(sl.plan1.threshold, sl.plan2.threshold, sl.plan4.threshold, sl.plan5.threshold);
+          label = "Multiple plans (lowest threshold)";
+        } else {
+          const plan = sl[planKey];
+          if (plan){
+            threshold = plan.threshold;
+            rate = plan.rate;
+            label = plan.label;
+          }
+        }
+
+        if (threshold != null){
+          mainRepay = Math.max(0, income - threshold) * rate;
+        }
+      }
+
+      if (hasPgl){
+        pglRepay = Math.max(0, income - sl.postgrad.threshold) * sl.postgrad.rate;
+      }
+
+      return {
+        total: round2(mainRepay + pglRepay),
+        main: round2(mainRepay),
+        pgl: round2(pglRepay)
+      };
+    }
+
+    // ---------- Pension & sacrifice handling ----------
+    // We model 3 pension treatments:
+    // - net_pay: reduces taxable pay (income tax), not NI
+    // - relief_at_source: does NOT reduce taxable pay here (it reduces tax via relief), we approximate by boosting “pension value” into grossed-up contribution and giving basic-rate relief only if user is higher rate? That gets messy.
+    //   For simplicity & clarity: we treat RAS as a post-tax deduction from net pay (user-paid) and show an informational note in breakdown.
+    // - salary_sacrifice: reduces taxable pay AND NI pay
+    function computePension(grossEarnings, method, inputType, value){
+      const v = clamp0(value);
+      if (method === "none" || v === 0) return { employee: 0, sacrifice: 0, postTax: 0, note: "" };
+
+      const amount = (inputType === "amount") ? v : (grossEarnings * (v / 100));
+
+      if (method === "net_pay"){
+        return { employee: round2(amount), sacrifice: 0, postTax: 0, note: "Net Pay: reduces income tax, not NI (typical workplace scheme)." };
+      }
+      if (method === "salary_sacrifice"){
+        return { employee: 0, sacrifice: round2(amount), postTax: 0, note: "Salary Sacrifice: reduces income tax and NI (approx)." };
+      }
+      if (method === "relief_at_source"){
+        return { employee: 0, sacrifice: 0, postTax: round2(amount), note: "Relief at Source: taken after pay. Provider adds 20% basic-rate relief separately (not fully modelled)." };
+      }
+      return { employee: 0, sacrifice: 0, postTax: 0, note: "" };
+    }
+
+    // ---------- Main calculation ----------
+    function validate(){
+      const salary = Number(document.getElementById('salary').value);
+      if (!Number.isFinite(salary) || salary < 0) return "Salary must be 0 or more.";
+
+      const tc = String(document.getElementById('taxCode').value || "").trim();
+      if (!tc) return "Please enter a tax code (e.g. 1257L).";
+
+      return null;
+    }
+
+    function buildBreakdownRow(name, annual, note=""){
+      const m = annual / 12;
+      return `
+        <tr>
+          <td><b>${name}</b></td>
+          <td>${GBP(round2(annual))}</td>
+          <td>${GBP(round2(m))}</td>
+          <td class="muted">${note}</td>
+        </tr>
+      `;
+    }
+
+    function calculate(e){
+      e.preventDefault();
+      hideMsg();
+
+      const err = validate();
+      if (err){ showMsg(err, "bad"); return; }
+
+      const rules = getRules();
+
+      // 1) Annualise base salary
+      const salary = Number(document.getElementById('salary').value);
+      const salaryFreq = document.getElementById('salaryFreq').value;
+      const baseAnnual = annualiseSalary(salary, salaryFreq);
+
+      // 2) Add extra pay
+      const bonus = clamp0(document.getElementById('bonus').value);
+      const overtime = clamp0(document.getElementById('overtime').value);
+      const cashAllowances = clamp0(document.getElementById('cashAllowances').value);
+      const benefitsInKind = clamp0(document.getElementById('benefitsInKind').value);
+      const benefitsApplyNI = document.getElementById('benefitsApplyNI').checked;
+
+      // Working gross earnings for this tool:
+      const grossEarnings = round2(baseAnnual + bonus + overtime + cashAllowances + benefitsInKind);
+
+      // 3) Pension + sacrifice
+      const pensionMethod = document.getElementById('pensionMethod').value;
+      const pensionInputType = document.getElementById('pensionInputType').value;
+      const pensionValue = Number(document.getElementById('pensionValue').value);
+
+      const pension = computePension(grossEarnings, pensionMethod, pensionInputType, pensionValue);
+
+      const otherSac = clamp0(document.getElementById('salarySacrificeOther').value);
+      const childcare = clamp0(document.getElementById('childcareVouchers').value);
+      const totalSacrifice = round2(pension.sacrifice + otherSac + childcare);
+
+      // 4) Other deductions
+      const otherPreTaxDed = clamp0(document.getElementById('otherPreTaxDed').value);
+      const otherPostTaxDed = clamp0(document.getElementById('otherPostTaxDed').value);
+
+      // 5) Region + tax code
+      const isScotland = document.getElementById('isScotland').checked;
+      const parsedTaxCode = parseTaxCode(document.getElementById('taxCode').value);
+
+      const hasBlindAllowance = document.getElementById('blindAllowance').checked;
+
+      // 6) Define pay bases:
+      // Taxable pay is reduced by:
+      // - salary sacrifice (pension sacrifice + other sacrifice + childcare)
+      // - net pay pension employee contribution
+      // - other pre-tax deductions
+      //
+      // NI pay is reduced by salary sacrifice items only (approx).
+      const taxablePayBeforePA = Math.max(0, grossEarnings - totalSacrifice - pension.employee - otherPreTaxDed);
+      const niPay = Math.max(0, (benefitsApplyNI ? grossEarnings : (grossEarnings - benefitsInKind)) - totalSacrifice);
+
+      // Adjusted net income for PA taper: a rough proxy is taxable pay before PA.
+      // In real life, ANI has more nuance, but this is a solid “calculator-grade” approximation.
+      const ani = taxablePayBeforePA;
+
+      const paInfo = computePersonalAllowance(rules, parsedTaxCode, ani, hasBlindAllowance);
+      const personalAllowance = paInfo.allowance;
+      const negativeAllowance = paInfo.neg;
+
+      const taxableIncome = Math.max(0, taxablePayBeforePA - personalAllowance + negativeAllowance);
+
+      // 7) Income tax
+      const incomeTax = computeIncomeTax(rules, isScotland, taxableIncome, parsedTaxCode);
+
+      // 8) NI
+      const noNI = document.getElementById('noNI').checked;
+      const ni = computeNI(rules, niPay, noNI);
+
+      // 9) Student loans
+      const slPlan = document.getElementById('slPlan').value;
+      const hasPgl = document.getElementById('hasPgl').checked;
+
+      // Student loan repayment income usually uses gross minus certain salary sacrifice.
+      // We'll use taxablePayBeforePA + personalAllowance (i.e. roughly gross after sacrifice and net-pay pension),
+      // but keep it simple: use (grossEarnings - totalSacrifice - otherPreTaxDed).
+      const slIncome = Math.max(0, grossEarnings - totalSacrifice - otherPreTaxDed);
+      const sl = computeStudentLoans(rules, slIncome, slPlan, hasPgl);
+
+      // 10) Net pay
+      const postTaxPension = pension.postTax; // for Relief at Source modelling (post-tax deduction)
+      const totalDeductions = round2(incomeTax.tax + ni + sl.total + pension.employee + totalSacrifice + postTaxPension + otherPreTaxDed + otherPostTaxDed);
+
+      // Important: salary sacrifice and other pre-tax deductions reduce gross-to-net mechanically,
+      // but conceptually they're “spent” rather than “lost”. We'll show them separately in breakdown.
+      const netAnnual = round2(grossEarnings - incomeTax.tax - ni - sl.total - pension.employee - postTaxPension - otherPostTaxDed - otherPreTaxDed - totalSacrifice);
+      const netMonthly = round2(netAnnual / 12);
+
+      // Effective rate (tax+NI only) on gross earnings after sacrifice? People interpret this differently.
+      // We'll do (tax+NI) / gross earnings.
+      const eff = grossEarnings > 0 ? ((incomeTax.tax + ni) / grossEarnings) : 0;
+
+      // 11) Render outputs
+      document.getElementById('results').style.display = 'block';
+
+      document.getElementById('grossOut').textContent = GBP(grossEarnings);
+      document.getElementById('netAnnual').textContent = GBP(netAnnual);
+      document.getElementById('netMonthly').textContent = GBP(netMonthly);
+      document.getElementById('effRate').textContent = (eff * 100).toFixed(1) + "%";
+
+      document.getElementById('taxOut').textContent = GBP(incomeTax.tax);
+      document.getElementById('niOut').textContent = GBP(ni);
+      document.getElementById('slOut').textContent = GBP(sl.total);
+
+      // Pension shown as employee-paid (net pay) + post-tax (RAS). Sacrifice shown separately.
+      document.getElementById('pensionOut').textContent = GBP(pension.employee + pension.postTax);
+      document.getElementById('sacOut').textContent = GBP(totalSacrifice);
+
+      // Breakdown table
+      const tb = document.getElementById('breakdownTbody');
+      let rows = "";
+
+      rows += buildBreakdownRow("Gross earnings (annualised)", grossEarnings, "Base + bonus + overtime + allowances + benefits.");
+      rows += buildBreakdownRow("Salary sacrifice (total)", -totalSacrifice, "Reduces taxable pay (and usually NI). Includes childcare vouchers & sacrifice pension.");
+      if (pension.employee > 0) rows += buildBreakdownRow("Pension (Net Pay)", -pension.employee, pension.note);
+      if (pension.postTax > 0) rows += buildBreakdownRow("Pension (Relief at Source, paid by you)", -pension.postTax, pension.note);
+      if (otherPreTaxDed > 0) rows += buildBreakdownRow("Other deductions (pre-tax)", -otherPreTaxDed, "Reduces taxable pay (approx).");
+
+      rows += buildBreakdownRow("Personal Allowance used", -personalAllowance, `Tax code mode: ${paInfo.mode}${parsedTaxCode.isEmergency ? " (M1/W1/X flag ignored in annualised model)" : ""}.`);
+      if (negativeAllowance > 0) rows += buildBreakdownRow("K code adjustment (adds to taxable)", negativeAllowance, "Negative allowance increases taxable income.");
+
+      rows += buildBreakdownRow("Taxable income", taxableIncome, isScotland ? "Scottish bands applied." : "rUK bands applied.");
+
+      // Tax bands detail
+      if (incomeTax.lines && incomeTax.lines.length){
+        const detail = incomeTax.lines.map(l => `${l.name}: ${GBP(l.amount)} × ${(l.rate*100).toFixed(0)}%`).join(" · ");
+        rows += buildBreakdownRow("Income tax", -incomeTax.tax, detail);
+      } else {
+        rows += buildBreakdownRow("Income tax", -incomeTax.tax, "");
+      }
+
+      rows += buildBreakdownRow("National Insurance (employee)", -ni, noNI ? "NI disabled." : "Class 1 annualised estimate.");
+      if (sl.total > 0){
+        const slNote = [];
+        if (sl.main > 0) slNote.push("Main plan: " + GBP(sl.main));
+        if (sl.pgl > 0) slNote.push("Postgrad: " + GBP(sl.pgl));
+        rows += buildBreakdownRow("Student loan repayments", -sl.total, slNote.join(" · "));
+      } else {
+        rows += buildBreakdownRow("Student loan repayments", 0, "None selected / below threshold.");
+      }
+
+      if (otherPostTaxDed > 0) rows += buildBreakdownRow("Other deductions (post-tax)", -otherPostTaxDed, "Taken after net pay.");
+
+      rows += buildBreakdownRow("Take-home pay", netAnnual, "What lands in your bank (estimate).");
+
+      tb.innerHTML = rows;
+    }
+
+    function reset(e){
+      e.preventDefault();
+      hideMsg();
+
+      document.getElementById('salary').value = 35000;
+      document.getElementById('salaryFreq').value = "annual";
+      document.getElementById('taxYear').value = "2025_26";
+      document.getElementById('taxCode').value = "1257L";
+      document.getElementById('isScotland').checked = false;
+      document.getElementById('noNI').checked = false;
+
+      document.getElementById('bonus').value = 0;
+      document.getElementById('overtime').value = 0;
+      document.getElementById('cashAllowances').value = 0;
+      document.getElementById('benefitsInKind').value = 0;
+      document.getElementById('benefitsApplyNI').checked = false;
+
+      document.getElementById('pensionMethod').value = "none";
+      document.getElementById('pensionInputType').value = "percent";
+      document.getElementById('pensionValue').value = 5;
+      document.getElementById('salarySacrificeOther').value = 0;
+      document.getElementById('childcareVouchers').value = 0;
+
+      document.getElementById('slPlan').value = "none";
+      document.getElementById('hasPgl').checked = false;
+
+      document.getElementById('blindAllowance').checked = false;
+      document.getElementById('otherPreTaxDed').value = 0;
+      document.getElementById('otherPostTaxDed').value = 0;
+
+      document.getElementById('daysPerWeek').value = 5;
+      document.getElementById('weeksPerYear').value = 52;
+
+      document.getElementById('results').style.display = "none";
+      document.getElementById('breakdownTbody').innerHTML = `<tr><td colspan="4" class="muted">Calculate to see breakdown.</td></tr>`;
+    }
+
+    // ---------- init wiring ----------
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+    document.getElementById('resetBtn').addEventListener('click', reset);
+
+    // Populate tax year dropdown from TAX_RULES (future-proof)
+    (function initTaxYears(){
+      const sel = document.getElementById('taxYear');
+      sel.innerHTML = Object.entries(TAX_RULES)
+        .map(([k,v]) => `<option value="${k}">${v.label}</option>`)
+        .join("");
+      sel.value = "2025_26";
+    })();
+  </script>
+</body>
+</html>
