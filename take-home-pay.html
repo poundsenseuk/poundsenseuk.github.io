@@ -804,24 +804,20 @@
       let rows = "";
       
       // --- Income & adjustments ---
-      rows += buildSectionRow("Income & adjustments");
       rows += buildBreakdownRow("Gross earnings (annualised)", grossEarnings, "Base + bonus + overtime + allowances + benefits.");
       
       // Sacrifice & pension
-      rows += buildSectionRow("Pre-tax / salary sacrifice items");
       if (totalSacrifice > 0) rows += buildBreakdownRow("Salary sacrifice (total)", -totalSacrifice, "Reduces taxable pay (and usually NI). Includes childcare vouchers & sacrifice pension.");
       if (pension.employee > 0) rows += buildBreakdownRow("Pension (Net Pay)", -pension.employee, pension.note);
       if (pension.postTax > 0) rows += buildBreakdownRow("Pension (Relief at Source, paid by you)", -pension.postTax, pension.note);
       if (otherPreTaxDed > 0) rows += buildBreakdownRow("Other deductions (pre-tax)", -otherPreTaxDed, "Reduces taxable pay (approx).");
       
       // Allowances & taxable
-      rows += buildSectionRow("Taxable income setup");
       rows += buildBreakdownRow("Personal Allowance used", -personalAllowance, `Tax code mode: ${paInfo.mode}${parsedTaxCode.isEmergency ? " (M1/W1/X ignored in annualised model)" : ""}.`);
       if (negativeAllowance > 0) rows += buildBreakdownRow("K code adjustment (adds to taxable)", negativeAllowance, "Negative allowance increases taxable income.");
       rows += buildBreakdownRow("Taxable income", taxableIncome, isScotland ? "Scottish bands applied." : "rUK bands applied.");
       
       // Tax, NI, loans
-      rows += buildSectionRow("Statutory deductions");
       if (incomeTax.lines && incomeTax.lines.length){
         const detail = incomeTax.lines.map(l => `${l.name}: ${GBP(l.amount)} × ${(l.rate*100).toFixed(0)}%`).join(" · ");
         rows += buildBreakdownRow("Income tax", -incomeTax.tax, detail);
@@ -846,14 +842,10 @@
       
       // --- Totals (the bit you asked for) ---
       rows += buildSectionRow("Totals");
-      rows += buildBreakdownRow("Total tax + NI", -totalTaxAndNI, "Income tax + employee NI.");
-      rows += buildBreakdownRow("Total student loans", -totalLoans, "Main plan + postgrad (if selected).");
-      rows += buildBreakdownRow("Total pension (employee paid)", -totalPension, "Net Pay + Relief at Source (paid by you).");
-      rows += buildBreakdownRow("Total salary sacrifice", -totalSacrifice, "Pre-tax and usually pre-NI.");
-      rows += buildBreakdownRow("Total other deductions", -(totalPreTaxOther + totalPostTaxOther), "Pre-tax + post-tax.");
       
       // Grand total deductions + take-home
-      rows += buildBreakdownRow("TOTAL deductions (all)", -totalDeductionsAll, "Everything that reduces gross to take-home in this model.");
+      rows += buildBreakdownRow("Gross earnings (annualised)", grossEarnings, "Base + bonus + overtime + allowances + benefits.");
+      rows += buildBreakdownRow("Total deductions", -totalDeductionsAll, "Everything that reduces gross to take-home in this model.");
       rows += buildBreakdownRow("Take-home pay", netAnnual, "What lands in your bank (estimate).");
       
       // Reconciliation warning (optional)
