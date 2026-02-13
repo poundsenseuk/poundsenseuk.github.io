@@ -655,6 +655,16 @@
         </tr>
       `;
     }
+    
+    function buildSectionRow(title){
+      return `
+        <tr>
+          <td colspan="4" style="padding:10px 12px;">
+            <span class="score">${title}</span>
+          </td>
+        </tr>
+      `;
+    }
 
     function calculate(e){
       e.preventDefault();
@@ -747,6 +757,28 @@
       const netAnnual = round2(grossEarnings - incomeTax.tax - ni - sl.total - pension.employee - postTaxPension - otherPostTaxDed - otherPreTaxDed - totalSacrifice);
       const netMonthly = round2(netAnnual / 12);
 
+      const totalTaxAndNI = round2(incomeTax.tax + ni);
+      const totalLoans = round2(sl.total);
+      const totalPension = round2(pension.employee + pension.postTax);
+      const totalPreTaxOther = round2(otherPreTaxDed);
+      const totalPostTaxOther = round2(otherPostTaxDed);
+      
+      // This is the “everything that reduces gross to get to take-home” total
+      const totalDeductionsAll = round2(
+        incomeTax.tax +
+        ni +
+        sl.total +
+        pension.employee +
+        pension.postTax +
+        totalSacrifice +
+        otherPreTaxDed +
+        otherPostTaxDed
+      );
+      
+      // Reconciliation check (should be ~0)
+      const reconcile = round2(grossEarnings - totalDeductionsAll - netAnnual);
+
+
       // Effective rate (tax+NI only) on gross earnings after sacrifice? People interpret this differently.
       // We'll do (tax+NI) / gross earnings.
       const eff = grossEarnings > 0 ? ((incomeTax.tax + ni) / grossEarnings) : 0;
@@ -770,27 +802,34 @@
       // Breakdown table
       const tb = document.getElementById('breakdownTbody');
       let rows = "";
-
+      
+      // --- Income & adjustments ---
+      rows += buildSectionRow("Income & adjustments");
       rows += buildBreakdownRow("Gross earnings (annualised)", grossEarnings, "Base + bonus + overtime + allowances + benefits.");
-      rows += buildBreakdownRow("Salary sacrifice (total)", -totalSacrifice, "Reduces taxable pay (and usually NI). Includes childcare vouchers & sacrifice pension.");
+      
+      // Sacrifice & pension
+      rows += buildSectionRow("Pre-tax / salary sacrifice items");
+      if (totalSacrifice > 0) rows += buildBreakdownRow("Salary sacrifice (total)", -totalSacrifice, "Reduces taxable pay (and usually NI). Includes childcare vouchers & sacrifice pension.");
       if (pension.employee > 0) rows += buildBreakdownRow("Pension (Net Pay)", -pension.employee, pension.note);
       if (pension.postTax > 0) rows += buildBreakdownRow("Pension (Relief at Source, paid by you)", -pension.postTax, pension.note);
       if (otherPreTaxDed > 0) rows += buildBreakdownRow("Other deductions (pre-tax)", -otherPreTaxDed, "Reduces taxable pay (approx).");
-
-      rows += buildBreakdownRow("Personal Allowance used", -personalAllowance, `Tax code mode: ${paInfo.mode}${parsedTaxCode.isEmergency ? " (M1/W1/X flag ignored in annualised model)" : ""}.`);
+      
+      // Allowances & taxable
+      rows += buildSectionRow("Taxable income setup");
+      rows += buildBreakdownRow("Personal Allowance used", -personalAllowance, `Tax code mode: ${paInfo.mode}${parsedTaxCode.isEmergency ? " (M1/W1/X ignored in annualised model)" : ""}.`);
       if (negativeAllowance > 0) rows += buildBreakdownRow("K code adjustment (adds to taxable)", negativeAllowance, "Negative allowance increases taxable income.");
-
       rows += buildBreakdownRow("Taxable income", taxableIncome, isScotland ? "Scottish bands applied." : "rUK bands applied.");
-
-      // Tax bands detail
+      
+      // Tax, NI, loans
+      rows += buildSectionRow("Statutory deductions");
       if (incomeTax.lines && incomeTax.lines.length){
         const detail = incomeTax.lines.map(l => `${l.name}: ${GBP(l.amount)} × ${(l.rate*100).toFixed(0)}%`).join(" · ");
         rows += buildBreakdownRow("Income tax", -incomeTax.tax, detail);
       } else {
         rows += buildBreakdownRow("Income tax", -incomeTax.tax, "");
       }
-
-      rows += buildBreakdownRow("National Insurance (employee)", -ni, noNI ? "NI disabled." : "Class 1 annualised estimate.");
+      rows += buildBreakdownRow("National Insurance (employee)", -ni, document.getElementById('noNI').checked ? "NI disabled." : "Class 1 annualised estimate.");
+      
       if (sl.total > 0){
         const slNote = [];
         if (sl.main > 0) slNote.push("Main plan: " + GBP(sl.main));
@@ -799,11 +838,29 @@
       } else {
         rows += buildBreakdownRow("Student loan repayments", 0, "None selected / below threshold.");
       }
-
-      if (otherPostTaxDed > 0) rows += buildBreakdownRow("Other deductions (post-tax)", -otherPostTaxDed, "Taken after net pay.");
-
+      
+      if (otherPostTaxDed > 0){
+        rows += buildSectionRow("Other post-tax deductions");
+        rows += buildBreakdownRow("Other deductions (post-tax)", -otherPostTaxDed, "Taken after net pay.");
+      }
+      
+      // --- Totals (the bit you asked for) ---
+      rows += buildSectionRow("Totals");
+      rows += buildBreakdownRow("Total tax + NI", -totalTaxAndNI, "Income tax + employee NI.");
+      rows += buildBreakdownRow("Total student loans", -totalLoans, "Main plan + postgrad (if selected).");
+      rows += buildBreakdownRow("Total pension (employee paid)", -totalPension, "Net Pay + Relief at Source (paid by you).");
+      rows += buildBreakdownRow("Total salary sacrifice", -totalSacrifice, "Pre-tax and usually pre-NI.");
+      rows += buildBreakdownRow("Total other deductions", -(totalPreTaxOther + totalPostTaxOther), "Pre-tax + post-tax.");
+      
+      // Grand total deductions + take-home
+      rows += buildBreakdownRow("TOTAL deductions (all)", -totalDeductionsAll, "Everything that reduces gross to take-home in this model.");
       rows += buildBreakdownRow("Take-home pay", netAnnual, "What lands in your bank (estimate).");
-
+      
+      // Reconciliation warning (optional)
+      if (Math.abs(reconcile) > 0.5){
+        rows += buildBreakdownRow("⚠ Reconciliation difference", reconcile, "Should be ~£0. If not, there’s a modelling mismatch.");
+      }
+      
       tb.innerHTML = rows;
     }
 
