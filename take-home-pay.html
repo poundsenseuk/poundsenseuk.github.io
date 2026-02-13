@@ -368,18 +368,18 @@
         blindPersonsAllowance: 3130, // annual (approx; adjust if tax year changes)
 
         incomeTax: {
-          rUK: [ // England/Wales/NI (aka rUK for this tool)
-            { upTo: 50270, rate: 0.20, name: "Basic" },        // taxable up to 50,270
-            { upTo: 125140, rate: 0.40, name: "Higher" },      // taxable up to 125,140
-            { upTo: Infinity, rate: 0.45, name: "Additional" } // above
+          rUK_total: [
+            { upTo: 50270,  rate: 0.20, name: "Basic" },
+            { upTo: 125140, rate: 0.40, name: "Higher" },
+            { upTo: Infinity, rate: 0.45, name: "Additional" }
           ],
-          scotland: [
-            { upTo: 15397, rate: 0.19, name: "Starter" },      // taxable up to 15,397
-            { upTo: 27491, rate: 0.20, name: "Basic" },        // taxable up to 27,491
-            { upTo: 43662, rate: 0.21, name: "Intermediate" }, // taxable up to 43,662
-            { upTo: 75000, rate: 0.42, name: "Higher" },       // taxable up to 75,000
-            { upTo: 125140, rate: 0.45, name: "Advanced" },    // taxable up to 125,140
-            { upTo: Infinity, rate: 0.48, name: "Top" }        // above
+          scotland_total: [
+            { upTo: 14876,  rate: 0.19, name: "Starter" },
+            { upTo: 26561,  rate: 0.20, name: "Basic" },
+            { upTo: 43662,  rate: 0.21, name: "Intermediate" },
+            { upTo: 75000,  rate: 0.42, name: "Higher" },
+            { upTo: 125140, rate: 0.45, name: "Advanced" },
+            { upTo: Infinity, rate: 0.48, name: "Top" }
           ]
         },
 
@@ -507,48 +507,50 @@
       return { allowance: pa, neg, mode: "standard" };
     }
 
-    function applyProgressiveTax(taxable, bands){
-      let remaining = Math.max(0, taxable);
-      let lastCap = 0;
+    function applyProgressiveTaxTotalIncome(totalIncome, personalAllowance, bandsTotal){
+      const TI = Math.max(0, totalIncome);
+      const PA = Math.max(0, personalAllowance);
+    
       let tax = 0;
-      const lines = [];
-
-      for (const b of bands){
-        const cap = b.upTo;
-        const slice = Math.max(0, Math.min(remaining, cap - lastCap));
-        const sliceTax = slice * b.rate;
-        if (slice > 0){
-          lines.push({ name: b.name, amount: slice, rate: b.rate, tax: sliceTax });
+      let lines = [];
+    
+      let prevUpper = 0;
+    
+      for (const b of bandsTotal){
+        const upper = b.upTo;
+    
+        // Income slice in this band (total income space)
+        const sliceTotal = Math.max(0, Math.min(TI, upper) - prevUpper);
+    
+        // Only the part above PA is taxable
+        const taxableSlice = Math.max(0, Math.min(TI, upper) - Math.max(PA, prevUpper));
+    
+        const sliceTax = taxableSlice * b.rate;
+    
+        if (taxableSlice > 0){
+          lines.push({ name: b.name, amount: taxableSlice, rate: b.rate, tax: sliceTax });
         }
+    
         tax += sliceTax;
-        remaining -= slice;
-        lastCap = cap;
-        if (remaining <= 0) break;
+        prevUpper = upper;
+        if (TI <= upper) break;
       }
+    
       return { tax: round2(tax), lines };
     }
-
-    function computeIncomeTax(rules, isScotland, taxableIncome, parsedTaxCode){
-      // Flat tax codes:
+    
+    function computeIncomeTax(rules, isScotland, totalIncomeForTax, personalAllowance, parsedTaxCode){
+      // Flat tax codes: still apply on taxable income only (no PA)
       if (parsedTaxCode.kind === "flat"){
-        const code = parsedTaxCode.code;
-        if (code === "NT") return { tax: 0, lines: [{name:"NT", amount: taxableIncome, rate: 0, tax: 0}] };
-
-        // BR: all at 20% (rUK basic)
-        if (code === "BR") return { tax: round2(taxableIncome * 0.20), lines: [{name:"BR", amount: taxableIncome, rate: 0.20, tax: taxableIncome * 0.20}] };
-
-        // D0: all at 40%
-        if (code === "D0") return { tax: round2(taxableIncome * 0.40), lines: [{name:"D0", amount: taxableIncome, rate: 0.40, tax: taxableIncome * 0.40}] };
-
-        // D1: all at 45%
-        if (code === "D1") return { tax: round2(taxableIncome * 0.45), lines: [{name:"D1", amount: taxableIncome, rate: 0.45, tax: taxableIncome * 0.45}] };
-
-        // fallback
-        return { tax: 0, lines: [{name:"Flat code", amount: taxableIncome, rate: 0, tax: 0}] };
+        const taxable = Math.max(0, totalIncomeForTax - personalAllowance);
+        if (parsedTaxCode.code === "NT") return { tax: 0, lines: [{name:"NT", amount: taxable, rate:0, tax:0}] };
+        if (parsedTaxCode.code === "BR") return { tax: round2(taxable * 0.20), lines: [{name:"BR", amount: taxable, rate:0.20, tax: taxable*0.20}] };
+        if (parsedTaxCode.code === "D0") return { tax: round2(taxable * 0.40), lines: [{name:"D0", amount: taxable, rate:0.40, tax: taxable*0.40}] };
+        if (parsedTaxCode.code === "D1") return { tax: round2(taxable * 0.45), lines: [{name:"D1", amount: taxable, rate:0.45, tax: taxable*0.45}] };
       }
-
-      const bands = isScotland ? rules.incomeTax.scotland : rules.incomeTax.rUK;
-      return applyProgressiveTax(taxableIncome, bands);
+    
+      const bands = isScotland ? rules.incomeTax.scotland_total : rules.incomeTax.rUK_total;
+      return applyProgressiveTaxTotalIncome(totalIncomeForTax, personalAllowance, bands);
     }
 
     // ---------- National Insurance (employee, annualised) ----------
@@ -729,10 +731,18 @@
       const personalAllowance = paInfo.allowance;
       const negativeAllowance = paInfo.neg;
 
-      const taxableIncome = Math.max(0, taxablePayBeforePA - personalAllowance + negativeAllowance);
+      // total income used for band thresholds (includes K-code effect via negativeAllowance)
+      const totalIncomeForTax = Math.max(0, taxablePayBeforePA + negativeAllowance);
+      
+      const incomeTax = computeIncomeTax(
+        rules,
+        isScotland,
+        totalIncomeForTax,
+        personalAllowance,
+        parsedTaxCode
+      );
 
-      // 7) Income tax
-      const incomeTax = computeIncomeTax(rules, isScotland, taxableIncome, parsedTaxCode);
+      const taxableIncome = Math.max(0, totalIncomeForTax - personalAllowance);
 
       // 8) NI
       const noNI = document.getElementById('noNI').checked;
